@@ -234,7 +234,7 @@ export function PhotoGrid() {
 
       {!showNoResults && (
         <div ref={setScrollRoot} className="min-h-0 flex-1 overflow-auto p-4">
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(182px,1fr))] gap-3">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
             {displayPhotos.map((photo) => (
               <PhotoGridItem
                 key={photo.id}
