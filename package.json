@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "build:app": "npm run build && tauri build --no-bundle",
+    "build:installer": "npm run build && tauri build",
     "preview": "vite preview",
     "tauri": "tauri"
   },
