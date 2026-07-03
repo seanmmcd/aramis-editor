@@ -1,0 +1,29 @@
+# Third-Party Notices
+
+Aramis Editor includes open-source software from third parties. The following
+notices apply to those components.
+
+## rawloader (LGPL-2.1)
+
+Aramis Editor uses [rawloader](https://github.com/pedrocr/rawloader) for RAW
+image decoding. rawloader is licensed under the GNU Lesser General Public
+License v2.1 (LGPL-2.1).
+
+Source: https://github.com/pedrocr/rawloader
+
+When distributing binaries that include rawloader, recipients must be able to
+modify and relink the library. Providing this project's full source code and
+build instructions satisfies that requirement.
+
+## Other dependencies
+
+Most other dependencies are licensed under permissive terms (MIT, Apache-2.0,
+BSD, etc.). Run the following from `src-tauri` to generate a full license
+report:
+
+```bash
+cargo license
+```
+
+Frontend dependencies are listed in `package-lock.json` and are predominantly
+MIT-licensed.

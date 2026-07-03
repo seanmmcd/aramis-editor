@@ -1,0 +1,14 @@
+---
+description: Rebuild the app after making code changes
+alwaysApply: true
+---
+
+# Rebuild after changes
+
+After completing code changes in this project, always run a full build before finishing:
+
+```bash
+npm run build:app
+```
+
+Run this from the repo root. Report build success or failure to the user. If the build fails, fix the errors and rebuild until it passes.
