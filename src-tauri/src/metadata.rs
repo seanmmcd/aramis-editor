@@ -7,6 +7,13 @@ use crate::edits::{BasicEdits, CropEdits, DetailEdits, EditStack};
 use crate::raw::{embedded_jpeg, rawloader_backend};
 use crate::xmp;
 
+/// Baseline develop settings before user edits (metadata defaults only, no sidecar stack).
+pub fn original_edits_for_path(path: &Path) -> EditStack {
+    let mut edits = EditStack::default();
+    enrich_from_metadata(&mut edits, path);
+    edits
+}
+
 /// Resolve develop edits for a file with no catalog row: XMP sidecar, then metadata gaps.
 pub fn detect_edits_for_path(path: &Path) -> EditStack {
     if xmp::has_sidecar(path) {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { notifyDevelopPersist, onDevelopPersist } from "@/stores/editsEvents";
+import { onDevelopPersist } from "@/stores/editsEvents";
 import { applyRestoredEdits, useDevelopStore } from "@/stores/useDevelopStore";
 import type { EditStack, HistoryEntry } from "@/types/edits";
 
@@ -46,7 +46,16 @@ export function HistoryPanel() {
     try {
       const next = await invoke<EditStack>("restore_history", { photoId, historyId });
       applyRestoredEdits(next);
-      notifyDevelopPersist({ type: "edits-saved", photoId });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const restoreOriginal = async () => {
+    if (photoId == null) return;
+    try {
+      const next = await invoke<EditStack>("restore_original", { photoId });
+      applyRestoredEdits(next);
     } catch (e) {
       console.error(e);
     }
@@ -63,34 +72,49 @@ export function HistoryPanel() {
   return (
     <div className="max-h-56 overflow-y-auto px-2 py-1 text-xs">
       <p className="mb-1 px-1 text-ae-text-secondary">
-        Auto-saved steps. Click Revert to restore a state.
+        Auto-saved steps. Revert restores a step without adding history.
       </p>
       {entries.length === 0 ? (
         <p className="px-1 py-2 text-ae-text-secondary">No history yet.</p>
       ) : (
         <ul className="space-y-0.5">
-          {entries.map((entry) => (
-            <li key={entry.id}>
-              <button
-                type="button"
-                onClick={() => void restore(entry.id)}
-                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-ae-bg-panel"
-                title={`Revert to: ${entry.label}`}
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium text-ae-text-primary">
-                    {entry.label}
-                  </span>
-                  <span className="block text-ae-text-secondary">
-                    {formatTimestamp(entry.timestamp)}
-                  </span>
-                </span>
-                <span className="shrink-0 rounded border border-ae-border px-2 py-0.5 text-[10px] uppercase tracking-wide text-ae-accent">
-                  Revert
-                </span>
-              </button>
-            </li>
-          ))}
+          {entries.map((entry, index) => {
+            const isOldest = index === entries.length - 1;
+            return (
+              <li key={entry.id}>
+                <div className="flex w-full items-center gap-2 rounded px-2 py-1.5 hover:bg-ae-bg-panel">
+                  <div className="min-w-0 flex-1">
+                    <span className="block truncate font-medium text-ae-text-primary">
+                      {entry.label}
+                    </span>
+                    <span className="block text-ae-text-secondary">
+                      {formatTimestamp(entry.timestamp)}
+                    </span>
+                  </div>
+                  <div className="flex shrink-0 flex-col gap-1">
+                    <button
+                      type="button"
+                      onClick={() => void restore(entry.id)}
+                      className="rounded border border-ae-border px-2 py-0.5 text-[10px] uppercase tracking-wide text-ae-accent hover:bg-ae-bg-panel"
+                      title={`Revert to: ${entry.label}`}
+                    >
+                      Revert
+                    </button>
+                    {isOldest && (
+                      <button
+                        type="button"
+                        onClick={() => void restoreOriginal()}
+                        className="rounded border border-ae-border px-2 py-0.5 text-[10px] uppercase tracking-wide text-ae-text-secondary hover:bg-ae-bg-panel hover:text-ae-text-primary"
+                        title="Restore original settings before edits"
+                      >
+                        Original
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

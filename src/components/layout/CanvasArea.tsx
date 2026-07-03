@@ -379,7 +379,7 @@ export function CanvasArea() {
             />
             {cropMode && <CropOverlay bounds={imageBounds} />}
             {spotHealMode && !cropMode && (
-              <SpotHealOverlay bounds={imageBounds} imageRef={imageRef} />
+              <SpotHealOverlay bounds={imageBounds} imageRef={imageRef} zoom={zoom} />
             )}
           </div>
         )}

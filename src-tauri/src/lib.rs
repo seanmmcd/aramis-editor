@@ -147,6 +147,11 @@ fn restore_history(state: tauri::State<'_, AppState>, photo_id: i64, history_id:
 }
 
 #[tauri::command]
+fn restore_original(state: tauri::State<'_, AppState>, photo_id: i64) -> Result<EditStack, String> {
+    state.with_editor(|e| e.restore_original(photo_id))
+}
+
+#[tauri::command]
 fn create_snapshot(state: tauri::State<'_, AppState>, photo_id: i64, name: String) -> Result<i64, String> {
     state.with_editor(|e| e.create_snapshot(photo_id, &name))
 }
@@ -366,7 +371,7 @@ pub fn run() {
             refresh_folder_thumbnails, generate_thumbnails,
             get_photo_edits, get_edits_for_path, get_photo_id_by_path, save_edits, save_edits_for_path,
             create_preset, list_presets, delete_preset, apply_preset,
-            list_history, restore_history,
+            list_history, restore_history, restore_original,
             create_snapshot, list_snapshots, restore_snapshot,
             apply_edits,
             warm_preview_cache,

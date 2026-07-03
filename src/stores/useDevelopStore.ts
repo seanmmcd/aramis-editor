@@ -379,8 +379,12 @@ export async function flushSaveEdits(): Promise<void> {
 }
 
 export function applyRestoredEdits(edits: EditStack) {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
   useDevelopStore.getState().setEdits(edits);
-  schedulePreviewRefresh();
+  schedulePreviewRefresh({ skipSave: true });
 }
 
 export async function createCheckpoint(name: string): Promise<boolean> {

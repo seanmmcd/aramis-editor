@@ -10,6 +10,7 @@ type DragKind = "dest" | "source" | "radius";
 interface SpotHealOverlayProps {
   bounds: ImageBounds;
   imageRef: React.RefObject<HTMLImageElement | null>;
+  zoom: number;
 }
 
 function clamp01(value: number) {
@@ -30,7 +31,7 @@ function spotPixelRadius(spot: HealSpot, bounds: ImageBounds) {
   return spot.radius * minDim;
 }
 
-export function SpotHealOverlay({ bounds, imageRef }: SpotHealOverlayProps) {
+export function SpotHealOverlay({ bounds, imageRef, zoom }: SpotHealOverlayProps) {
   const spots = useDevelopStore((s) => s.edits.spot_heal.spots);
   const addHealSpot = useDevelopStore((s) => s.addHealSpot);
   const updateHealSpot = useDevelopStore((s) => s.updateHealSpot);
@@ -165,6 +166,14 @@ export function SpotHealOverlay({ bounds, imageRef }: SpotHealOverlayProps) {
     });
   };
 
+  const uiScale = 1 / Math.max(zoom, 0.25);
+  const strokeWidth = Math.max(0.5, uiScale);
+  const selectedStrokeWidth = Math.max(0.75, 1.25 * uiScale);
+  const handleSize = Math.max(6, 10 * uiScale);
+  const half = handleSize / 2;
+  const dashLength = Math.max(2, 4 * uiScale);
+  const gapLength = Math.max(2, 3 * uiScale);
+
   return (
     <div className="pointer-events-none absolute inset-0">
       <div
@@ -185,8 +194,6 @@ export function SpotHealOverlay({ bounds, imageRef }: SpotHealOverlayProps) {
         const sourceX = bounds.x + spot.source_x * bounds.width;
         const sourceY = bounds.y + spot.source_y * bounds.height;
         const radiusPx = spotPixelRadius(spot, bounds);
-        const handleSize = 10;
-        const half = handleSize / 2;
 
         return (
           <div key={spot.id}>
@@ -197,8 +204,8 @@ export function SpotHealOverlay({ bounds, imageRef }: SpotHealOverlayProps) {
                 x2={sourceX}
                 y2={sourceY}
                 stroke={selected ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.45)"}
-                strokeWidth={1}
-                strokeDasharray="4 3"
+                strokeWidth={strokeWidth}
+                strokeDasharray={`${dashLength} ${gapLength}`}
               />
               <circle
                 cx={destX}
@@ -206,22 +213,25 @@ export function SpotHealOverlay({ bounds, imageRef }: SpotHealOverlayProps) {
                 r={radiusPx}
                 fill="none"
                 stroke={selected ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.55)"}
-                strokeWidth={selected ? 2 : 1}
+                strokeWidth={selected ? selectedStrokeWidth : strokeWidth}
               />
             </svg>
             <div
-              className="pointer-events-auto absolute rounded-full border-2 border-white bg-ae-accent"
+              className="pointer-events-auto absolute rounded-full bg-ae-accent"
               style={{
                 left: sourceX - half,
                 top: sourceY - half,
                 width: handleSize,
                 height: handleSize,
+                borderWidth: Math.max(1, 2 * uiScale),
+                borderStyle: "solid",
+                borderColor: "white",
                 cursor: "move",
               }}
               onPointerDown={startDrag("source", spot)}
             />
             <div
-              className={`pointer-events-auto absolute rounded-full border-2 ${
+              className={`pointer-events-auto absolute rounded-full ${
                 selected ? "border-ae-accent bg-white" : "border-white bg-ae-bg-panel"
               }`}
               style={{
@@ -229,6 +239,9 @@ export function SpotHealOverlay({ bounds, imageRef }: SpotHealOverlayProps) {
                 top: destY - half,
                 width: handleSize,
                 height: handleSize,
+                borderWidth: Math.max(1, 2 * uiScale),
+                borderStyle: "solid",
+                borderColor: selected ? "var(--color-ae-accent, #3b82f6)" : "white",
                 cursor: "move",
               }}
               onPointerDown={startDrag("dest", spot)}
@@ -240,6 +253,7 @@ export function SpotHealOverlay({ bounds, imageRef }: SpotHealOverlayProps) {
                 top: destY - half,
                 width: handleSize,
                 height: handleSize,
+                borderWidth: Math.max(0.5, uiScale),
                 cursor: "ew-resize",
               }}
               onPointerDown={startDrag("radius", spot)}

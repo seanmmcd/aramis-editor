@@ -52,6 +52,11 @@ impl<'a> Editor<'a> {
         if let Ok(p) = self.catalog.get_photo_path(photo_id) { let _ = xmp::write_xmp(Path::new(&p), &edits); }
         Ok(edits)
     }
+    pub fn restore_original(&self, photo_id: i64) -> Result<EditStack, EditorError> {
+        let edits = self.catalog.restore_original(photo_id)?;
+        if let Ok(p) = self.catalog.get_photo_path(photo_id) { let _ = xmp::write_xmp(Path::new(&p), &edits); }
+        Ok(edits)
+    }
     pub fn create_snapshot(&self, photo_id: i64, name: &str) -> Result<i64, EditorError> { let e = self.catalog.get_photo_edits(photo_id)?; Ok(self.catalog.create_snapshot(photo_id, name, &e)?) }
     pub fn list_snapshots(&self, photo_id: i64) -> Result<Vec<Snapshot>, EditorError> { Ok(self.catalog.list_snapshots(photo_id)?) }
     pub fn restore_snapshot(&self, photo_id: i64, snapshot_id: i64) -> Result<EditStack, EditorError> {

@@ -371,8 +371,14 @@ impl Catalog {
         let e = self.get_history_entry(history_id)?;
         if e.photo_id != photo_id { return Err(rusqlite::Error::QueryReturnedNoRows); }
         self.set_photo_edits(photo_id, &e.edits)?;
-        self.push_history(photo_id, &format!("Restore: {}", e.label), &e.edits)?;
         Ok(e.edits)
+    }
+
+    pub fn restore_original(&self, photo_id: i64) -> SqlResult<EditStack> {
+        let path = self.get_photo_path(photo_id)?;
+        let edits = crate::metadata::original_edits_for_path(std::path::Path::new(&path));
+        self.set_photo_edits(photo_id, &edits)?;
+        Ok(edits)
     }
 
     pub fn create_snapshot(&self, photo_id: i64, name: &str, edits: &EditStack) -> SqlResult<i64> {
