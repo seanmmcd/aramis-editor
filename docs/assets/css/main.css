@@ -323,15 +323,16 @@ button {
 
 .preview {
   position: relative;
-  display: grid;
-  place-items: center;
   min-height: 0;
   min-width: 0;
-  align-self: center;
+  width: 100%;
+  height: 100%;
+  align-self: stretch;
 }
 
 .preview__screen {
-  grid-area: 1 / 1;
+  position: absolute;
+  inset: 0;
   margin: 0;
   opacity: 0;
   transition: opacity 0.35s ease;
@@ -349,7 +350,8 @@ button {
 .preview__screen img {
   width: 65%;
   height: auto;
-  max-height: calc((100dvh - var(--topbar-h) - var(--footbar-h) - 2.5rem) * 1.105);
+  max-width: 100%;
+  max-height: calc((100dvh - var(--topbar-h) - var(--footbar-h) - 2.5rem) * 0.85 * 1.3);
   object-fit: contain;
 }
 
@@ -428,12 +430,12 @@ button {
 
   .preview {
     order: 1;
-    min-height: auto;
-    max-height: none;
+    min-height: 50vw;
+    max-height: 58.5vh;
   }
 
   .preview__screen img {
-    width: min(100%, 110.5%);
+    width: min(100%, calc(85% * 1.3));
     max-height: 58.5vh;
   }
 }
