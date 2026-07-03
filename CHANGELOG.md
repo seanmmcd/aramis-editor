@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.1.10 (2026-07-03)
+
+- Increase basic contrast slider strength further. (93063a5)
 ## v0.1.9 (2026-07-03)
 
 - Increase basic contrast slider strength. (13aa335)
