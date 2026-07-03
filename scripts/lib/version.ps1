@@ -39,8 +39,14 @@ function Set-ProjectVersion {
         Set-Content $tauriConf -NoNewline
 
     $cargoToml = Join-Path $Root "src-tauri\Cargo.toml"
-    (Get-Content $cargoToml -Raw) -replace '^version = "\d+\.\d+\.\d+"', "version = `"$Version`"" |
+    (Get-Content $cargoToml -Raw) -replace '(?m)^version = "\d+\.\d+\.\d+"', "version = `"$Version`"" |
         Set-Content $cargoToml -NoNewline
+}
+
+function Sync-ProjectVersion {
+    param([string]$Root)
+    $version = Get-ProjectVersion -Root $Root
+    Set-ProjectVersion -Root $Root -Version $version
 }
 
 function Bump-ProjectVersion {

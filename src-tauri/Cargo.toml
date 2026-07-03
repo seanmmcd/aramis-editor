@@ -1,6 +1,6 @@
 [package]
 name = "aramis-editor"
-version = "0.1.0"
+version = "0.1.4"
 description = "Aramis Editor — desktop photo editor"
 authors = ["Aramis Editor contributors"]
 edition = "2021"
@@ -31,6 +31,7 @@ thiserror = "2"
 anyhow = "1"
 fast_image_resize = "5"
 dirs = "6"
+rayon = "1"
 
 [profile.release]
 codegen-units = 16

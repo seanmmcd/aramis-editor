@@ -2,6 +2,8 @@ pub fn clamp01(v: f32) -> f32 { v.clamp(0.0, 1.0) }
 pub fn clamp(v: f32, lo: f32, hi: f32) -> f32 { v.clamp(lo, hi) }
 pub fn lerp(a: f32, b: f32, t: f32) -> f32 { a + (b - a) * t }
 
+use rayon::prelude::*;
+
 fn sample(data: &[f32], width: u32, x: u32, y: u32, channel: u32) -> f32 {
     data[((y * width + x) * 3 + channel) as usize]
 }
@@ -48,31 +50,37 @@ pub fn gaussian_blur(data: &[f32], width: u32, height: u32, sigma: f32) -> Vec<f
     let w = width as i32;
     let h = height as i32;
     let mut temp = vec![0.0f32; data.len()];
+    temp.par_chunks_mut((w * 3) as usize)
+        .enumerate()
+        .for_each(|(y, row)| {
+            let y = y as i32;
+            for x in 0..w {
+                for c in 0..3i32 {
+                    let mut s = 0.0f32;
+                    for (ki, &kw) in kernel.iter().enumerate() {
+                        let sx = (x + ki as i32 - radius).clamp(0, w - 1) as u32;
+                        s += sample(data, width, sx, y as u32, c as u32) * kw;
+                    }
+                    row[(x * 3 + c) as usize] = s;
+                }
+            }
+        });
     let mut out = vec![0.0f32; data.len()];
-    for y in 0..h {
-        for x in 0..w {
-            for c in 0..3i32 {
-                let mut s = 0.0f32;
-                for (ki, &kw) in kernel.iter().enumerate() {
-                    let sx = (x + ki as i32 - radius).clamp(0, w - 1) as u32;
-                    s += sample(data, width, sx, y as u32, c as u32) * kw;
+    out.par_chunks_mut((w * 3) as usize)
+        .enumerate()
+        .for_each(|(y, row)| {
+            let y = y as i32;
+            for x in 0..w {
+                for c in 0..3i32 {
+                    let mut s = 0.0f32;
+                    for (ki, &kw) in kernel.iter().enumerate() {
+                        let sy = (y + ki as i32 - radius).clamp(0, h - 1) as u32;
+                        s += sample(&temp, width, x as u32, sy, c as u32) * kw;
+                    }
+                    row[(x * 3 + c) as usize] = s;
                 }
-                temp[((y * w + x) * 3 + c) as usize] = s;
             }
-        }
-    }
-    for y in 0..h {
-        for x in 0..w {
-            for c in 0..3i32 {
-                let mut s = 0.0f32;
-                for (ki, &kw) in kernel.iter().enumerate() {
-                    let sy = (y + ki as i32 - radius).clamp(0, h - 1) as u32;
-                    s += sample(&temp, width, x as u32, sy, c as u32) * kw;
-                }
-                out[((y * w + x) * 3 + c) as usize] = s;
-            }
-        }
-    }
+        });
     out
 }
 

@@ -24,7 +24,10 @@ pub use detail::{apply_detail, apply_detail_preview, apply_preview_sharpen_compe
 pub use effects::{apply_effects, EffectsEdits};
 pub use hsl::{apply_hsl, HslEdits};
 pub use lens::{apply_lens, LensEdits};
-pub use stack::{apply_edit_stack, apply_edit_stack_preview, apply_edit_stack_preview_skip_crop, apply_edit_stack_skip_crop};
+pub use stack::{
+    apply_edit_stack, apply_edit_stack_preview, apply_edit_stack_preview_skip_crop,
+    apply_edit_stack_skip_crop, apply_geometry_edits, apply_pixel_edits,
+};
 pub use tone_curve::{apply_tone_curve, ParametricCurve, ToneCurveEdits};
 pub use transform::{apply_transform, TransformEdits};
 

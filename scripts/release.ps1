@@ -8,6 +8,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..")
+$DryRunPrefix = "(dry-run)"
 
 . (Join-Path $PSScriptRoot "lib\version.ps1")
 . (Join-Path $PSScriptRoot "lib\patchnotes.ps1")
@@ -55,7 +56,7 @@ try {
         Write-Host "Uncommitted changes detected:" -ForegroundColor Yellow
         Write-Host $status
         if (-not $DryRun) {
-            $answer = Read-Host "Continue anyway? [y/N]"
+            $answer = Read-Host 'Continue anyway? (y/N)'
             if ($answer -notmatch '^[Yy]') {
                 throw "Release cancelled."
             }
@@ -65,13 +66,24 @@ try {
     $currentVersion = Get-ProjectVersion -Root $Root
     Write-Host "Current version: $currentVersion"
 
+    $commitsSinceTag = @(Get-CommitsSinceLastTag -Root $Root)
+    $lastTag = git tag -l "v*" --sort=-v:refname 2>$null | Select-Object -First 1
+    $republishOnly = ($commitsSinceTag.Count -eq 0 -and $lastTag)
+
     if ($Bump -match '^\d+\.\d+\.\d+$') {
         $newVersion = $Bump
         if ($DryRun) {
-            Write-Host "[dry-run] Would set version to $newVersion"
+            Write-Host "$DryRunPrefix Would set version to $newVersion"
         }
         else {
             Set-ProjectVersion -Root $Root -Version $newVersion
+        }
+    }
+    elseif ($republishOnly -and $Bump -eq "patch") {
+        $newVersion = $currentVersion
+        Write-Host "No commits since $lastTag - republishing v$newVersion without bumping" -ForegroundColor Yellow
+        if (-not $DryRun) {
+            Sync-ProjectVersion -Root $Root
         }
     }
     else {
@@ -87,7 +99,7 @@ try {
                 "patch" { $parts[2]++ }
             }
             $newVersion = "{0}.{1}.{2}" -f $parts[0], $parts[1], $parts[2]
-            Write-Host "[dry-run] Would bump $part -> $newVersion"
+            Write-Host "$DryRunPrefix Would bump $part -> $newVersion"
         }
         else {
             $newVersion = Bump-ProjectVersion -Root $Root -Part $part
@@ -98,18 +110,24 @@ try {
     Write-Host "Release version: $newVersion ($tag)"
 
     if ($DryRun) {
-        Write-Host "[dry-run] Would generate patch notes from git history"
+        Write-Host "$DryRunPrefix Would generate patch notes from git history"
     }
     else {
-        $notesFile = New-ReleasePatchnotes -Root $Root -Version $newVersion
-        Write-Host "Patch notes written to: $notesFile"
+        $notesFile = Join-Path $Root "releases\$tag.md"
+        if ($republishOnly -and (Test-Path $notesFile)) {
+            Write-Host "Using existing patch notes: $notesFile"
+        }
+        else {
+            $notesFile = New-ReleasePatchnotes -Root $Root -Version $newVersion -Commits $commitsSinceTag
+            Write-Host "Patch notes written to: $notesFile"
+        }
     }
 
     if ($DryRun) {
-        Write-Host "[dry-run] Would commit version bump and patch notes"
-        Write-Host "[dry-run] Would build Windows NSIS installer"
+        Write-Host "$DryRunPrefix Would commit version bump and patch notes"
+        Write-Host "$DryRunPrefix Would build Windows NSIS installer"
         if (-not $NoPush) {
-            Write-Host "[dry-run] Would tag $tag, push, and create GitHub release"
+            Write-Host "$DryRunPrefix Would tag $tag, push, and create GitHub release"
         }
         Write-Host ""
         Write-Host "Dry run complete." -ForegroundColor Green
@@ -117,14 +135,36 @@ try {
     }
 
     git add VERSION package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml CHANGELOG.md releases/
-    git commit -m "Release $tag"
-    if ($LASTEXITCODE -ne 0) {
-        throw "git commit failed"
+    if ($republishOnly) {
+        $pending = git diff --cached --name-only
+        if (-not $pending) {
+            Write-Host "Version files already up to date - skipping commit." -ForegroundColor Yellow
+        }
+        else {
+            git commit -m "Sync version files for $tag"
+            if ($LASTEXITCODE -ne 0) {
+                throw "git commit failed"
+            }
+        }
+    }
+    else {
+        git commit -m "Release $tag"
+        if ($LASTEXITCODE -ne 0) {
+            throw "git commit failed"
+        }
     }
 
-    git tag -a $tag -m "Release $tag"
-    if ($LASTEXITCODE -ne 0) {
-        throw "git tag failed"
+    if (-not $republishOnly) {
+        git tag -a $tag -m "Release $tag"
+        if ($LASTEXITCODE -ne 0) {
+            throw "git tag failed"
+        }
+    }
+    elseif (-not (git tag -l $tag)) {
+        git tag -a $tag -m "Release $tag"
+        if ($LASTEXITCODE -ne 0) {
+            throw "git tag failed"
+        }
     }
 
     if (-not $SkipBuild) {

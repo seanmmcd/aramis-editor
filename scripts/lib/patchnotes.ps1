@@ -2,40 +2,44 @@ function Get-CommitsSinceLastTag {
     param([string]$Root)
     Push-Location $Root
     try {
-        $lastTag = git describe --tags --abbrev=0 --match "v*" 2>$null
-        if ($LASTEXITCODE -eq 0 -and $lastTag) {
-            return git log "$lastTag..HEAD" --pretty=format:"- %s (%h)"
+        $lastTag = git tag -l "v*" --sort=-v:refname 2>$null | Select-Object -First 1
+        if ($lastTag) {
+            return @(git log "$lastTag..HEAD" --pretty=format:"- %s (%h)")
         }
-        return git log --pretty=format:"- %s (%h)"
+        return @(git log --pretty=format:"- %s (%h)")
     }
     finally {
         Pop-Location
     }
 }
 
+function Format-CommitLines {
+    param([string[]]$Commits)
+    $lines = @($Commits | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($lines.Count -eq 0) {
+        return @("- Maintenance release")
+    }
+    return $lines
+}
+
 function New-ReleasePatchnotes {
     param(
         [string]$Root,
-        [string]$Version
+        [string]$Version,
+        [string[]]$Commits
     )
-    $commits = @(Get-CommitsSinceLastTag -Root $Root)
-    if ($commits.Count -eq 0) {
-        $commits = @("- Maintenance release")
-    }
+    $commitLines = Format-CommitLines -Commits $Commits
 
     $date = Get-Date -Format "yyyy-MM-dd"
     $tag = "v$Version"
-    $lines = @(
+    $body = (@(
         "# Aramis Editor $tag",
         "",
         "Released: $date",
         "",
         "## Changes",
-        "",
-        $commits,
         ""
-    )
-    $body = $lines -join "`r`n"
+    ) + $commitLines + @("")) -join "`r`n"
 
     $releasesDir = Join-Path $Root "releases"
     if (-not (Test-Path $releasesDir)) {
@@ -45,15 +49,16 @@ function New-ReleasePatchnotes {
     Set-Content -Path $notesFile -Value $body
 
     $changelog = Join-Path $Root "CHANGELOG.md"
-    $entry = @(
+    $entry = (@(
         "## $tag ($date)",
-        "",
-        $commits,
         ""
-    ) -join "`r`n"
+    ) + $commitLines + @("")) -join "`r`n"
 
     if (Test-Path $changelog) {
         $existing = Get-Content $changelog -Raw
+        if ($existing -match "(?m)^## $([regex]::Escape($tag)) \(") {
+            $existing = $existing -replace "(?ms)^## $([regex]::Escape($tag)) \(.*?\r?\n\r?\n.*?\r?\n\r?\n", ""
+        }
         if ($existing -match '(?m)^# Changelog') {
             $updated = $existing -replace '(?m)^# Changelog\r?\n\r?\n', "# Changelog`r`n`r`n$entry"
             Set-Content $changelog $updated -NoNewline

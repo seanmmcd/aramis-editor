@@ -174,9 +174,6 @@ fn is_supported(path: &Path) -> bool {
 
 /// Fast sRGB thumbnail — embedded JPEG for RAW, direct decode for JPEG; no linear pipeline.
 fn write_thumbnail_file(source: &Path, out_path: &Path) -> anyhow::Result<()> {
-    use image::codecs::jpeg::JpegEncoder;
-    use image::ExtendedColorType;
-
     let ext = source
         .extension()
         .and_then(|v| v.to_str())
@@ -194,13 +191,14 @@ fn write_thumbnail_file(source: &Path, out_path: &Path) -> anyhow::Result<()> {
     let thumb = dyn_img.thumbnail(THUMB_MAX, THUMB_MAX);
     let rgb = thumb.to_rgb8();
     let mut buffer = Vec::new();
-    let mut encoder = JpegEncoder::new_with_quality(&mut buffer, THUMB_JPEG_QUALITY);
-    encoder.encode(
+    crate::jpeg_encode::write_srgb_jpeg(
+        &mut buffer,
         rgb.as_raw(),
         rgb.width(),
         rgb.height(),
-        ExtendedColorType::Rgb8,
-    )?;
+        THUMB_JPEG_QUALITY,
+    )
+    .map_err(|e| anyhow::anyhow!(e))?;
     fs::write(out_path, buffer)?;
     Ok(())
 }

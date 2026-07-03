@@ -1,15 +1,18 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use image::{ExtendedColorType, ImageFormat, RgbImage};
+use image::{ImageFormat, RgbImage};
+
+use crate::jpeg_encode;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::editor::Editor;
-use crate::edits::{apply_edit_stack, EditStack};
-use crate::metadata::{normalize_edits_for_raw_render, read_exif_orientation_tag};
+use crate::edits::{apply_geometry_edits, apply_pixel_edits, EditStack};
+use crate::metadata::enrich_from_metadata;
 use crate::raw::{
-    apply_exif_orientation, decode_image_full_on_large_stack, linear_rgb_to_srgb_bytes, DecodedImage,
+    decode_image_on_large_stack, linear_rgb_to_srgb_bytes, resize_for_export,
+    resize_for_preview_fast, DecodedImage,
 };
 use crate::upscale::{upscale_image, UpscaleFactor};
 
@@ -88,15 +91,16 @@ pub fn export_photo(
     edits: &EditStack,
     settings: &ExportSettings,
 ) -> Result<ExportResult, String> {
-    let mut decoded = decode_image_full_on_large_stack(path).map_err(|e| e.to_string())?;
-    if let Some(tag) = read_exif_orientation_tag(path) {
-        decoded = apply_exif_orientation(decoded, tag);
-    }
+    let mut decoded = decode_image_on_large_stack(path).map_err(|e| e.to_string())?;
     let mut edits = edits.clone();
-    normalize_edits_for_raw_render(&mut edits);
-    let rendered = apply_edit_stack(decoded, &edits);
-    let resized = apply_resize(rendered, settings);
-    let upscaled = upscale_image(&resized, settings.upscale_factor).map_err(|e| e.to_string())?;
+    enrich_from_metadata(&mut edits, path);
+
+    let mut working = apply_geometry_edits(decoded, &edits);
+    if let Some((nw, nh)) = export_work_dimensions(&working, settings) {
+        working = downscale_for_export(working, nw, nh, settings);
+    }
+    let rendered = apply_pixel_edits(working, &edits);
+    let upscaled = upscale_image(&rendered, settings.upscale_factor).map_err(|e| e.to_string())?;
     let output_path = build_output_path(path, settings)?;
     write_image(&upscaled, &output_path, path, settings)?;
     Ok(ExportResult {
@@ -163,33 +167,47 @@ pub fn export_batch(
     }
 }
 
-fn apply_resize(image: DecodedImage, settings: &ExportSettings) -> DecodedImage {
-    match settings.resize_mode {
-        ResizeMode::Original => image,
+fn export_work_dimensions(image: &DecodedImage, settings: &ExportSettings) -> Option<(u32, u32)> {
+    let (nw, nh) = match settings.resize_mode {
+        ResizeMode::Original => (image.width, image.height),
         ResizeMode::LongEdge => {
             if settings.long_edge == 0 {
-                return image;
+                return None;
             }
             let max_dim = image.width.max(image.height);
             if max_dim <= settings.long_edge {
-                return image;
+                return None;
             }
             let scale = settings.long_edge as f32 / max_dim as f32;
-            let nw = ((image.width as f32 * scale).round() as u32).max(1);
-            let nh = ((image.height as f32 * scale).round() as u32).max(1);
-            resize_to(image, nw, nh)
+            (
+                ((image.width as f32 * scale).round() as u32).max(1),
+                ((image.height as f32 * scale).round() as u32).max(1),
+            )
         }
         ResizeMode::Dimensions => {
             if settings.width == 0 || settings.height == 0 {
-                return image;
+                return None;
             }
-            resize_to(image, settings.width, settings.height)
+            (settings.width, settings.height)
         }
+    };
+    if nw < image.width || nh < image.height {
+        Some((nw, nh))
+    } else {
+        None
     }
 }
 
-fn resize_to(image: DecodedImage, nw: u32, nh: u32) -> DecodedImage {
-    crate::raw::resize_to(&image, nw, nh)
+fn downscale_for_export(
+    image: DecodedImage,
+    nw: u32,
+    nh: u32,
+    settings: &ExportSettings,
+) -> DecodedImage {
+    match settings.resize_mode {
+        ResizeMode::LongEdge => resize_for_preview_fast(&image, nw.max(nh)),
+        _ => resize_for_export(image, nw, nh),
+    }
 }
 
 fn build_output_path(source: &Path, settings: &ExportSettings) -> Result<PathBuf, String> {
@@ -251,16 +269,13 @@ fn write_image(
     match format {
         ImageFormat::Jpeg => {
             let mut file = fs::File::create(output).map_err(|e| e.to_string())?;
-            let quality = settings.quality.clamp(1, 100);
-            let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut file, quality);
-            encoder
-                .encode(
-                    img.as_raw(),
-                    image.width,
-                    image.height,
-                    ExtendedColorType::Rgb8,
-                )
-                .map_err(|e| e.to_string())?;
+            jpeg_encode::write_srgb_jpeg(
+                &mut file,
+                img.as_raw(),
+                image.width,
+                image.height,
+                settings.quality,
+            )?;
         }
         _ => img.save_with_format(output, format).map_err(|e| e.to_string())?,
     }

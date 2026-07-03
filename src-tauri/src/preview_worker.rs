@@ -237,20 +237,16 @@ fn render_job(
 
 fn encode_preview_image(preview: &DecodedImage, quality: PreviewQuality) -> Result<PreviewResponse, String> {
     use base64::{engine::general_purpose::STANDARD, Engine};
-    use image::codecs::jpeg::JpegEncoder;
-    use image::ExtendedColorType;
 
     let rgb = raw::linear_rgb_to_srgb_bytes(&preview.data);
     let mut buffer = Vec::new();
-    let mut encoder = JpegEncoder::new_with_quality(&mut buffer, quality.jpeg_quality());
-    encoder
-        .encode(
-            &rgb,
-            preview.width,
-            preview.height,
-            ExtendedColorType::Rgb8,
-        )
-        .map_err(|e| e.to_string())?;
+    crate::jpeg_encode::write_srgb_jpeg(
+        &mut buffer,
+        &rgb,
+        preview.width,
+        preview.height,
+        quality.jpeg_quality(),
+    )?;
     Ok(PreviewResponse {
         width: preview.width,
         height: preview.height,

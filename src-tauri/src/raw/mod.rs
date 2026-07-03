@@ -1,6 +1,7 @@
 use std::path::Path;
 use std::sync::OnceLock;
 
+use rayon::prelude::*;
 use thiserror::Error;
 
 pub mod embedded_jpeg;
@@ -95,36 +96,6 @@ pub fn decode_image_on_large_stack(path: &Path) -> Result<DecodedImage, DecodeEr
         .map_err(|_| DecodeError::Msg("decode thread panicked".into()))?
 }
 
-/// Full-resolution decode for export and develop preview (skips embedded JPEG on RAW).
-pub fn decode_image_full_resolution(path: &Path) -> Result<DecodedImage, DecodeError> {
-    let ext = path
-        .extension()
-        .and_then(|v| v.to_str())
-        .map(str::to_ascii_lowercase)
-        .ok_or_else(|| DecodeError::Msg("no extension".into()))?;
-    if rawloader_backend::SUPPORTED.contains(&ext.as_str()) {
-        rawloader_backend::decode(path).and_then(|img| {
-            if is_decoded_blank(&img) {
-                Err(DecodeError::Msg("blank raw decode".into()))
-            } else {
-                Ok(img)
-            }
-        })
-    } else {
-        decode_image(path)
-    }
-}
-
-pub fn decode_image_full_on_large_stack(path: &Path) -> Result<DecodedImage, DecodeError> {
-    let path = path.to_path_buf();
-    std::thread::Builder::new()
-        .stack_size(DECODE_STACK)
-        .spawn(move || decode_image_full_resolution(&path))
-        .map_err(|e| DecodeError::Msg(e.to_string()))?
-        .join()
-        .map_err(|_| DecodeError::Msg("decode thread panicked".into()))?
-}
-
 /// Read image dimensions without full pixel decode.
 pub fn read_dimensions(path: &Path) -> Result<(u32, u32), DecodeError> {
     let ext = path
@@ -179,12 +150,16 @@ pub fn linear_to_srgb_buffer(data: &[f32], width: u32, height: u32) -> Vec<u8> {
 
 pub fn linear_rgb_to_srgb_bytes(data: &[f32]) -> Vec<u8> {
     let lut = srgb_lut_16();
-    let mut out = Vec::with_capacity(data.len());
-    for &v in data {
-        let idx = (v.clamp(0.0, 1.0) * 65535.0) as usize;
-        out.push(lut[idx]);
-    }
-    out
+    data.par_iter()
+        .map(|&v| {
+            if v <= 1.0 {
+                let idx = (v * 65535.0).round() as usize;
+                lut[idx.min(65535)]
+            } else {
+                linear_to_srgb_u8(v)
+            }
+        })
+        .collect()
 }
 
 fn srgb_lut_16() -> &'static [u8; 65536] {
@@ -196,6 +171,23 @@ fn srgb_lut_16() -> &'static [u8; 65536] {
         }
         lut
     })
+}
+
+/// Fast downscale for export when the output is much smaller than the source.
+pub fn resize_for_export(image: DecodedImage, nw: u32, nh: u32) -> DecodedImage {
+    if image.width == nw && image.height == nh {
+        return image;
+    }
+    let longest = image.width.max(image.height);
+    let target_longest = nw.max(nh);
+    if nw < image.width && nh < image.height && longest > target_longest * 2 {
+        let mut current = image;
+        while current.width > nw * 2 && current.height > nh * 2 {
+            current = half_downsample(&current);
+        }
+        return resize_to(&current, nw, nh);
+    }
+    resize_to(&image, nw, nh)
 }
 
 pub fn resize_for_preview(image: &DecodedImage, max_dim: u32) -> DecodedImage {
@@ -232,6 +224,21 @@ pub fn apply_exif_orientation(mut image: DecodedImage, orientation: u32) -> Deco
         6 => rotate_90_cw(&mut image),
         8 => rotate_90_ccw(&mut image),
         _ => {}
+    }
+    image
+}
+
+/// Apply rawloader orientation (flip then transpose per lib docs).
+pub fn apply_rawloader_orientation(mut image: DecodedImage, orientation: rawloader::Orientation) -> DecodedImage {
+    let (transpose, flip_h, flip_v) = orientation.to_flips();
+    if flip_h {
+        flip_horizontal(&mut image);
+    }
+    if flip_v {
+        flip_vertical(&mut image);
+    }
+    if transpose {
+        transpose_in_place(&mut image);
     }
     image
 }
@@ -287,6 +294,50 @@ fn rotate_90_ccw(image: &mut DecodedImage) {
             let dst_y = w - 1 - x;
             let src = ((y * w + x) * 3) as usize;
             let dst = ((dst_y * h + dst_x) * 3) as usize;
+            out[dst..dst + 3].copy_from_slice(&image.data[src..src + 3]);
+        }
+    }
+    image.width = h;
+    image.height = w;
+    image.data = out;
+}
+
+fn flip_horizontal(image: &mut DecodedImage) {
+    let w = image.width;
+    let h = image.height;
+    for y in 0..h {
+        for x in 0..(w / 2) {
+            let a = ((y * w + x) * 3) as usize;
+            let b = ((y * w + (w - 1 - x)) * 3) as usize;
+            for c in 0..3 {
+                image.data.swap(a + c, b + c);
+            }
+        }
+    }
+}
+
+fn flip_vertical(image: &mut DecodedImage) {
+    let w = image.width;
+    let h = image.height;
+    for y in 0..(h / 2) {
+        for x in 0..w {
+            let a = ((y * w + x) * 3) as usize;
+            let b = (((h - 1 - y) * w + x) * 3) as usize;
+            for c in 0..3 {
+                image.data.swap(a + c, b + c);
+            }
+        }
+    }
+}
+
+fn transpose_in_place(image: &mut DecodedImage) {
+    let w = image.width;
+    let h = image.height;
+    let mut out = vec![0.0f32; image.data.len()];
+    for y in 0..h {
+        for x in 0..w {
+            let src = ((y * w + x) * 3) as usize;
+            let dst = ((x * h + y) * 3) as usize;
             out[dst..dst + 3].copy_from_slice(&image.data[src..src + 3]);
         }
     }

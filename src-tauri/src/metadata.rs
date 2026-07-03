@@ -119,12 +119,6 @@ pub fn read_as_shot_white_balance(path: &Path) -> Option<(f32, f32)> {
     rawloader_backend::read_as_shot_white_balance(path)
 }
 
-/// Align develop preview with full-RAW export (neutral WB baseline).
-pub fn normalize_edits_for_raw_render(edits: &mut EditStack) {
-    edits.basic.wb_baseline_temp = 6500.0;
-    edits.basic.wb_baseline_tint = 0.0;
-}
-
 pub fn read_exif_orientation_tag(path: &Path) -> Option<u32> {
     let file = fs::File::open(path).ok()?;
     let mut buf = std::io::BufReader::new(file);

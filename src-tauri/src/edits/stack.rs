@@ -6,11 +6,15 @@ use super::{
     apply_transform, EditStack,
 };
 
-pub fn apply_edit_stack(mut image: DecodedImage, stack: &EditStack) -> DecodedImage {
+/// Lens, transform, and crop — must run at full decode resolution.
+pub fn apply_geometry_edits(mut image: DecodedImage, stack: &EditStack) -> DecodedImage {
     image = apply_lens(image, &stack.lens);
     image = apply_transform(image, &stack.transform);
-    image = apply_crop(image, &stack.crop);
+    apply_crop(image, &stack.crop)
+}
 
+/// Color and detail adjustments — safe to run at export working resolution.
+pub fn apply_pixel_edits(image: DecodedImage, stack: &EditStack) -> DecodedImage {
     let width = image.width;
     let height = image.height;
     let mut data = image.data;
@@ -24,6 +28,11 @@ pub fn apply_edit_stack(mut image: DecodedImage, stack: &EditStack) -> DecodedIm
     apply_effects(&mut data, width, height, &stack.effects);
 
     DecodedImage { width, height, data }
+}
+
+pub fn apply_edit_stack(mut image: DecodedImage, stack: &EditStack) -> DecodedImage {
+    image = apply_geometry_edits(image, stack);
+    apply_pixel_edits(image, stack)
 }
 
 /// Fast path for interactive preview — sharpening at preview resolution; skips noise reduction.

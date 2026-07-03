@@ -126,27 +126,30 @@ fn apply_color_nr(data: &mut [f32], width: u32, height: u32, edits: &DetailEdits
     let original = data.to_vec();
     for y in 0..height {
         for x in 0..width {
-            let mut rs = Vec::new();
-            let mut gs = Vec::new();
-            let mut bs = Vec::new();
+            let mut rs = [0.0f32; 9];
+            let mut gs = [0.0f32; 9];
+            let mut bs = [0.0f32; 9];
+            let mut i = 0usize;
             for dy in -1i32..=1 {
                 for dx in -1i32..=1 {
                     let sx = (x as i32 + dx).clamp(0, width as i32 - 1) as u32;
                     let sy = (y as i32 + dy).clamp(0, height as i32 - 1) as u32;
                     let idx = ((sy * width + sx) * 3) as usize;
-                    rs.push(original[idx]);
-                    gs.push(original[idx + 1]);
-                    bs.push(original[idx + 2]);
+                    rs[i] = original[idx];
+                    gs[i] = original[idx + 1];
+                    bs[i] = original[idx + 2];
+                    i += 1;
                 }
             }
-            rs.sort_by(|a, b| a.partial_cmp(b).unwrap());
-            gs.sort_by(|a, b| a.partial_cmp(b).unwrap());
-            bs.sort_by(|a, b| a.partial_cmp(b).unwrap());
-            let mid = rs.len() / 2;
             let idx = ((y * width + x) * 3) as usize;
-            data[idx] = original[idx] * (1.0 - strength) + rs[mid] * strength;
-            data[idx + 1] = original[idx + 1] * (1.0 - strength) + gs[mid] * strength;
-            data[idx + 2] = original[idx + 2] * (1.0 - strength) + bs[mid] * strength;
+            data[idx] = original[idx] * (1.0 - strength) + median9(rs) * strength;
+            data[idx + 1] = original[idx + 1] * (1.0 - strength) + median9(gs) * strength;
+            data[idx + 2] = original[idx + 2] * (1.0 - strength) + median9(bs) * strength;
         }
     }
+}
+
+fn median9(mut values: [f32; 9]) -> f32 {
+    values.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    values[4]
 }

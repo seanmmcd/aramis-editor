@@ -2,6 +2,7 @@ mod catalog;
 mod editor;
 mod edits;
 mod export;
+mod jpeg_encode;
 mod history;
 mod library;
 mod metadata;
@@ -22,8 +23,6 @@ use edits::EditStack;
 use export::{export_batch, export_photo, BatchExportResult, ExportResult, ExportSettings};
 use history::HistoryEntry;
 use library::{ImportResult, Library, LibraryError};
-use image::codecs::jpeg::JpegEncoder;
-use image::ExtendedColorType;
 use presets::Preset;
 use preview_worker::{PreviewCache, PreviewResponse, PreviewWorker};
 use snapshots::Snapshot;
@@ -179,15 +178,13 @@ fn save_edits_for_path(
 fn encode_quick_preview(preview: &raw::DecodedImage, quality: preview_worker::PreviewQuality) -> Result<PreviewResponse, String> {
     let rgb = raw::linear_rgb_to_srgb_bytes(&preview.data);
     let mut buffer = Vec::new();
-    let mut encoder = JpegEncoder::new_with_quality(&mut buffer, quality.jpeg_quality());
-    encoder
-        .encode(
-            &rgb,
-            preview.width,
-            preview.height,
-            ExtendedColorType::Rgb8,
-        )
-        .map_err(|e| e.to_string())?;
+    jpeg_encode::write_srgb_jpeg(
+        &mut buffer,
+        &rgb,
+        preview.width,
+        preview.height,
+        quality.jpeg_quality(),
+    )?;
     Ok(PreviewResponse {
         width: preview.width,
         height: preview.height,
