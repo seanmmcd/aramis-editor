@@ -3,146 +3,92 @@ layout: default
 title: Aramis Editor
 ---
 
-<header class="site-header">
-  <div class="container site-header__inner">
-    <a href="#" class="brand">
-      <span class="brand__mark" aria-hidden="true"></span>
-      <span>Aramis Editor</span>
-    </a>
-    <nav class="site-nav" aria-label="Primary">
-      <a href="#features">Features</a>
-      <a href="#screenshots">Screenshots</a>
-      <a href="{{ site.github_repo | prepend: 'https://github.com/' }}">GitHub</a>
-    </nav>
-    <a class="btn btn--primary btn--sm" href="{{ site.download_url }}">
-      Download
-    </a>
-  </div>
-</header>
+<div class="app-shell">
+  <header class="topbar">
+    <div class="topbar__brand">
+      <span class="topbar__logo" aria-hidden="true"></span>
+      <span class="topbar__name">Aramis Editor</span>
+    </div>
 
-<main>
-  <section class="hero">
-    <div class="container">
-      <span class="hero__eyebrow">Local-first photo editor</span>
-      <h1 class="hero__title">Edit beautifully.<br><em>Keep everything local.</em></h1>
-      <p class="hero__lead">
-        A desktop photo editor for library management, non-destructive develop
-        adjustments, and batch export — built with Tauri, Rust, and React.
-        Your photos never leave your machine.
+    <nav class="module-tabs" role="tablist" aria-label="App modules">
+      <button class="module-tab is-active" role="tab" aria-selected="true" data-module="library">
+        <span class="module-tab__label">Library</span>
+        <span class="module-tab__hint">Browse &amp; organize</span>
+      </button>
+      <button class="module-tab" role="tab" aria-selected="false" data-module="develop">
+        <span class="module-tab__label">Develop</span>
+        <span class="module-tab__hint">Non-destructive edits</span>
+      </button>
+      <button class="module-tab" role="tab" aria-selected="false" data-module="export">
+        <span class="module-tab__label">Export</span>
+        <span class="module-tab__hint">Batch output</span>
+      </button>
+    </nav>
+
+    <div class="topbar__actions">
+      <a class="link-quiet" href="{{ site.github_repo | prepend: 'https://github.com/' }}">GitHub</a>
+      <a class="btn btn--primary" href="{{ site.download_url }}">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1v9M8 10l3.5-3.5M8 10L4.5 6.5M2 13h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Download {{ site.latest_release }}
+      </a>
+    </div>
+  </header>
+
+  <main class="stage">
+    <aside class="pitch">
+      <p class="pitch__eyebrow">Local-first desktop editor</p>
+      <h1 class="pitch__title" data-pitch-title>Your photo library,<br>on your machine.</h1>
+      <p class="pitch__body" data-pitch-body>
+        Import folders, browse RAW and JPEG files with fast thumbnails,
+        and search your entire catalog — no cloud required.
       </p>
-      <div class="hero__actions">
-        <a class="btn btn--primary" href="{{ site.download_url }}">
+
+      <ul class="pitch__features" data-pitch-features>
+        <li>Folder import &amp; EXIF metadata</li>
+        <li>Thumbnail grid with search</li>
+        <li>Multi-select &amp; filmstrip</li>
+      </ul>
+
+      <div class="pitch__cta">
+        <a class="btn btn--primary btn--lg" href="{{ site.download_url }}">
           Download for Windows
         </a>
-        <a class="btn btn--ghost" href="{{ site.releases_url }}">
-          All releases
-        </a>
+        <a class="btn btn--secondary" href="{{ site.releases_url }}">Release notes</a>
       </div>
-      <p class="hero__meta">Latest release: {{ site.latest_release }} · Windows x64</p>
-    </div>
-  </section>
 
-  <section class="showcase" id="screenshots">
-    <div class="container">
-      <div class="showcase__frame">
-        <div class="showcase__tabs" role="tablist" aria-label="App screenshots">
-          <button class="showcase__tab is-active" role="tab" aria-selected="true" data-showcase-tab="library">Library</button>
-          <button class="showcase__tab" role="tab" aria-selected="false" data-showcase-tab="develop">Develop</button>
-          <button class="showcase__tab" role="tab" aria-selected="false" data-showcase-tab="export">Export</button>
+      <div class="pitch__badges">
+        <span class="badge">RAW · NEF, CR2, DNG</span>
+        <span class="badge">No telemetry</span>
+        <span class="badge">MIT</span>
+      </div>
+    </aside>
+
+    <section class="preview" aria-label="App preview">
+      <div class="preview__chrome">
+        <div class="preview__dots" aria-hidden="true">
+          <span></span><span></span><span></span>
         </div>
-        <div class="showcase__screens">
-          <figure class="showcase__screen is-active" data-showcase-screen="library">
-            <img src="{{ '/assets/images/screenshots/01-library.png' | relative_url }}" alt="Aramis Editor Library view showing photo thumbnails and folder navigation" width="1296" height="839" loading="eager">
-          </figure>
-          <figure class="showcase__screen" data-showcase-screen="develop">
-            <img src="{{ '/assets/images/screenshots/02-develop.png' | relative_url }}" alt="Aramis Editor Develop view with non-destructive editing panels" width="1296" height="839" loading="lazy">
-          </figure>
-          <figure class="showcase__screen" data-showcase-screen="export">
-            <img src="{{ '/assets/images/screenshots/03-export.png' | relative_url }}" alt="Aramis Editor Export view with batch export settings" width="1296" height="839" loading="lazy">
-          </figure>
-        </div>
+        <span class="preview__caption" data-preview-caption>Library</span>
       </div>
-    </div>
-  </section>
-
-  <section class="features" id="features">
-    <div class="container">
-      <span class="section-label">Features</span>
-      <h2 class="section-title">Everything you need to develop photos</h2>
-      <div class="feature-grid">
-        <article class="feature-card">
-          <div class="feature-card__icon" aria-hidden="true">📁</div>
-          <h3>Library</h3>
-          <p>Import folders, browse photos with thumbnails, search your entire catalog, and view EXIF metadata.</p>
-        </article>
-        <article class="feature-card">
-          <div class="feature-card__icon" aria-hidden="true">◐</div>
-          <h3>Develop</h3>
-          <p>Non-destructive editing with Basic, Tone Curve, HSL, Calibration, Crop, Transform, Lens, Detail, and Effects.</p>
-        </article>
-        <article class="feature-card">
-          <div class="feature-card__icon" aria-hidden="true">◎</div>
-          <h3>RAW support</h3>
-          <p>Edit CR2, NEF, ARW, DNG, and more. Full raw pipeline powered by rawloader.</p>
-        </article>
-        <article class="feature-card">
-          <div class="feature-card__icon" aria-hidden="true">↺</div>
-          <h3>History &amp; presets</h3>
-          <p>Save and recall edit states with presets, checkpoints, and a full edit history in a SQLite catalog.</p>
-        </article>
-        <article class="feature-card">
-          <div class="feature-card__icon" aria-hidden="true">✦</div>
-          <h3>Spot heal</h3>
-          <p>Remove distractions with spot healing tools integrated into the develop workflow.</p>
-        </article>
-        <article class="feature-card">
-          <div class="feature-card__icon" aria-hidden="true">↗</div>
-          <h3>Export</h3>
-          <p>Batch export to JPEG, PNG, or TIFF with quality, resize, and upscale options.</p>
-        </article>
+      <div class="preview__viewport">
+        <figure class="preview__screen is-active" data-preview-screen="library">
+          <img src="{{ '/assets/images/screenshots/01-library.png' | relative_url }}" alt="Library view with folder tree and photo grid" width="1296" height="839">
+        </figure>
+        <figure class="preview__screen" data-preview-screen="develop">
+          <img src="{{ '/assets/images/screenshots/02-develop.png' | relative_url }}" alt="Develop view with editing panels and photo preview" width="1296" height="839">
+        </figure>
+        <figure class="preview__screen" data-preview-screen="export">
+          <img src="{{ '/assets/images/screenshots/03-export.png' | relative_url }}" alt="Export view with batch export queue and settings" width="1296" height="839">
+        </figure>
       </div>
-    </div>
-  </section>
+    </section>
+  </main>
 
-  <section class="privacy">
-    <div class="container">
-      <div class="privacy__inner">
-        <div class="privacy__text">
-          <h2>Your photos stay yours</h2>
-          <p>Aramis Editor runs entirely on your machine. No cloud uploads, no telemetry, no accounts required.</p>
-        </div>
-        <ul class="privacy__points">
-          <li>Local catalog &amp; thumbnails</li>
-          <li>XMP sidecar support</li>
-          <li>Open source (MIT)</li>
-        </ul>
-      </div>
-    </div>
-  </section>
-
-  <section class="download" id="download">
-    <div class="container">
-      <div class="download__box">
-        <h2>Ready to edit?</h2>
-        <p>Download the latest Windows installer and start organizing, developing, and exporting your photos today.</p>
-        <a class="btn btn--primary" href="{{ site.download_url }}">
-          Download {{ site.latest_release }}
-        </a>
-        <p class="download__version">
-          <a href="{{ site.releases_url }}">View release notes on GitHub</a>
-        </p>
-      </div>
-    </div>
-  </section>
-</main>
-
-<footer class="site-footer">
-  <div class="container site-footer__inner">
-    <span>&copy; {{ site.time | date: '%Y' }} Aramis Editor</span>
-    <span>
-      <a href="{{ site.github_repo | prepend: 'https://github.com/' }}">Source code</a>
-      &nbsp;·&nbsp;
+  <footer class="footbar">
+    <span>Tauri · Rust · React</span>
+    <span class="footbar__links">
+      <a href="{{ site.github_repo | prepend: 'https://github.com/' }}">Source</a>
       <a href="{{ site.releases_url }}">Releases</a>
     </span>
-  </div>
-</footer>
+  </footer>
+</div>
