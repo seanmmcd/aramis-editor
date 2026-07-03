@@ -2,17 +2,17 @@
 
 A desktop photo editor for library management, non-destructive develop adjustments, and batch export. Built with **Tauri 2**, **Rust**, and **React**.
 
-Aramis Editor runs locally on your machine. Your photos, catalog, and edit history stay on disk — nothing is uploaded to a cloud service.
+Aramis Editor runs locally on your machine. Your photos, catalog, and edit history stay on disk; nothing is uploaded to a cloud service.
 
 ## Features
 
-- **Library** — Import folders, browse photos with thumbnails, view EXIF metadata
-- **Develop** — Non-destructive editing: Basic, Detail, Effects, Crop, Transform, Lens
-- **RAW support** — CR2, NEF, ARW, DNG, and more via [rawloader](https://github.com/pedrocr/rawloader)
-- **Edit stack** — Tone curve, HSL, color grading, calibration, crop, transform, lens, detail, effects
-- **Presets, history & snapshots** — Save and recall edit states in a SQLite catalog
-- **XMP sidecars** — Read and write standard Camera Raw settings sidecar files
-- **Export** — JPEG, PNG, TIFF with quality, resize, and upscale options
+- **Library**: Import folders, browse photos with thumbnails, view EXIF metadata
+- **Develop**: Non-destructive editing: Basic, Detail, Effects, Crop, Transform, Lens
+- **RAW support**: CR2, NEF, ARW, DNG, and more via [rawloader](https://github.com/pedrocr/rawloader)
+- **Edit stack**: Tone curve, HSL, color grading, calibration, crop, transform, lens, detail, effects
+- **Presets, history & snapshots**: Save and recall edit states in a SQLite catalog
+- **XMP sidecars**: Read and write standard Camera Raw settings sidecar files
+- **Export**: JPEG, PNG, TIFF with quality, resize, and upscale options
 
 ## Screenshots
 
@@ -83,6 +83,6 @@ Aramis Editor is a local-first application:
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
 
 Third-party licenses (including LGPL components) are documented in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).

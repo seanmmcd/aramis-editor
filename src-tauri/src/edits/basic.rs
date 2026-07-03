@@ -175,7 +175,7 @@ fn map_exposure_luminance(l: f32, gain: f32, ev: f32) -> f32 {
     filmic_shoulder(l * effective_gain)
 }
 
-/// Soft highlight rolloff — linear below 1.0, compressive shoulder above.
+/// Soft highlight rolloff: linear below 1.0, compressive shoulder above.
 fn filmic_shoulder(x: f32) -> f32 {
     if x <= 1.0 {
         x

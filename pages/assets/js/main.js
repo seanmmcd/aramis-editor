@@ -1,7 +1,7 @@
 const MODULES = {
   library: {
     title: "Your photo library,<br>on your machine.",
-    body: "Import folders, browse RAW and JPEG files with fast thumbnails, and search your entire catalog — no cloud required.",
+    body: "Import folders, browse RAW and JPEG files with fast thumbnails, and search your entire catalog, no cloud required.",
     features: [
       "Folder import & EXIF metadata",
       "Thumbnail grid with search",

@@ -36,7 +36,7 @@ ehthumbs.db
 # Test and coverage output
 coverage/
 
-# Local app data (catalog, thumbnails, caches) — lives in OS app-data dirs at runtime
+# Local app data (catalog, thumbnails, caches); lives in OS app-data dirs at runtime
 *.db
 *.sqlite
 *.sqlite3

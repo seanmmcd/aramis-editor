@@ -41,7 +41,7 @@ pub fn enrich_from_metadata(stack: &mut EditStack, path: &Path) {
         stack.basic.wb_baseline_temp = bt;
         stack.basic.wb_baseline_tint = bti;
     }
-    // Do not auto-apply EXIF orientation to transform.rotate — embedded JPEG / image
+    // Do not auto-apply EXIF orientation to transform.rotate; embedded JPEG / image
     // decoders already produce display-oriented pixels; applying rotate again inverts/flips.
     apply_default_sharpening(stack, path);
     sanitize_crop(stack);

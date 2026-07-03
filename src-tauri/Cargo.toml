@@ -1,7 +1,7 @@
 [package]
 name = "aramis-editor"
 version = "0.1.8"
-description = "Aramis Editor — desktop photo editor"
+description = "Aramis Editor, desktop photo editor"
 authors = ["Aramis Editor contributors"]
 edition = "2021"
 license = "MIT"

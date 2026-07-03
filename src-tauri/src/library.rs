@@ -181,7 +181,7 @@ fn is_supported(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-/// Fast sRGB thumbnail — embedded JPEG for RAW, direct decode for JPEG; no linear pipeline.
+/// Fast sRGB thumbnail: embedded JPEG for RAW, direct decode for JPEG; no linear pipeline.
 fn write_thumbnail_file(source: &Path, out_path: &Path) -> anyhow::Result<()> {
     let ext = source
         .extension()

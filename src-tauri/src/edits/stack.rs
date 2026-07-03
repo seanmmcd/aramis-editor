@@ -10,14 +10,14 @@ fn finish_stack(image: DecodedImage, stack: &EditStack) -> DecodedImage {
     apply_spot_heal(image, &stack.spot_heal)
 }
 
-/// Lens, transform, and crop — must run at full decode resolution.
+/// Lens, transform, and crop: must run at full decode resolution.
 pub fn apply_geometry_edits(mut image: DecodedImage, stack: &EditStack) -> DecodedImage {
     image = apply_lens(image, &stack.lens);
     image = apply_transform(image, &stack.transform);
     apply_crop(image, &stack.crop)
 }
 
-/// Color and detail adjustments — safe to run at export working resolution.
+/// Color and detail adjustments: safe to run at export working resolution.
 pub fn apply_pixel_edits(image: DecodedImage, stack: &EditStack) -> DecodedImage {
     let width = image.width;
     let height = image.height;
@@ -38,7 +38,7 @@ pub fn apply_edit_stack(image: DecodedImage, stack: &EditStack) -> DecodedImage 
     finish_stack(apply_pixel_edits(apply_geometry_edits(image, stack), stack), stack)
 }
 
-/// Fast path for interactive preview — sharpening at preview resolution; skips noise reduction.
+/// Fast path for interactive preview: sharpening at preview resolution; skips noise reduction.
 pub fn apply_edit_stack_preview(mut image: DecodedImage, stack: &EditStack) -> DecodedImage {
     image = apply_lens(image, &stack.lens);
     image = apply_transform(image, &stack.transform);
@@ -79,7 +79,7 @@ pub fn apply_edit_stack_skip_crop(mut image: DecodedImage, stack: &EditStack) ->
     finish_stack(DecodedImage { width, height, data }, stack)
 }
 
-/// Interactive preview while adjusting crop — same as preview path but leaves full frame visible.
+/// Interactive preview while adjusting crop: same as preview path but leaves full frame visible.
 pub fn apply_edit_stack_preview_skip_crop(mut image: DecodedImage, stack: &EditStack) -> DecodedImage {
     image = apply_lens(image, &stack.lens);
     image = apply_transform(image, &stack.transform);

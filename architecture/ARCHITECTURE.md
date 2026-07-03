@@ -1,4 +1,4 @@
-# Aramis Editor — Architecture Plan
+# Aramis Editor: Architecture Plan
 
 A high-performance desktop photo editor focused on library management and
 non-destructive develop adjustments (excluding pixel-level retouching and
