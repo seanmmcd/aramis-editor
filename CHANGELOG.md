@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.8 (2026-07-03)
+
+- Adjusted slider intensity Updated github site (a3cd50c)
+- Remove screenshot container styling and display at half size. (9cf9d4a)
+- Switch landing page to dark mode with bare screenshots and app icon. (97d1140)
+- Redesign landing page as a light, single-viewport app showcase. (6645605)
 ## v0.1.7 (2026-07-03)
 
 - Merge branch 'main' of https://github.com/seanmmcd/aramis-editor (72eabab)
