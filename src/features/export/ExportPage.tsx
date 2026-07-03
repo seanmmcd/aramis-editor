@@ -1,6 +1,13 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ContextMenu, openContextMenu, type ContextMenuState } from "@/components/ContextMenu";
+import { revealFileInExplorer } from "@/lib/revealFile";
+import type { Photo } from "@/features/library/types";
 import type { ExportFormat, ResizeMode, UpscaleFactor } from "@/types/edits";
+import { useDevelopStore } from "@/stores/useDevelopStore";
 import { useExportStore } from "@/stores/useExportStore";
+import { useUIStore } from "@/stores/useUIStore";
 
 const FORMATS: { value: ExportFormat; label: string }[] = [
   { value: "jpeg", label: "JPEG" },
@@ -23,8 +30,12 @@ const UPSCALE_OPTIONS: { value: UpscaleFactor; label: string }[] = [
 ];
 
 export function ExportPage() {
+  const navigate = useNavigate();
   const workingSetPhotos = useExportStore((s) => s.workingSetPhotos);
   const selectedPhotoIds = useExportStore((s) => s.selectedPhotoIds);
+  const openDevelopQueue = useDevelopStore((s) => s.openDevelopQueue);
+  const setActiveModule = useUIStore((s) => s.setActiveModule);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const {
     settings,
     setSettings,
@@ -46,6 +57,46 @@ export function ExportPage() {
 
   const selectAll = () => setSelectedPhotoIds(workingSetPhotos.map((p) => p.id));
   const selectNone = () => setSelectedPhotoIds([]);
+
+  const openInDevelop = async (photo: Photo) => {
+    await openDevelopQueue([
+      {
+        id: photo.id,
+        path: photo.file_path,
+        file_name: photo.file_name,
+        thumbnail_path: photo.thumbnail_path,
+      },
+    ]);
+    setActiveModule("develop");
+    navigate("/develop");
+  };
+
+  const onPhotoContextMenu = (e: React.MouseEvent, photo: Photo) => {
+    const checked = selectedPhotoIds.includes(photo.id);
+    openContextMenu(
+      e,
+      [
+        {
+          label: checked ? "Deselect for export" : "Select for export",
+          onClick: () => togglePhoto(photo.id),
+        },
+        {
+          label: "Open in Develop",
+          onClick: () => void openInDevelop(photo),
+        },
+        {
+          label: "Reveal in Explorer",
+          onClick: () => void revealFileInExplorer(photo.file_path),
+        },
+        {
+          label: "Remove from export queue",
+          destructive: true,
+          onClick: () => removeFromWorkingSet(photo.id),
+        },
+      ],
+      setContextMenu,
+    );
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -105,7 +156,10 @@ export function ExportPage() {
                     : undefined;
                   return (
                     <li key={photo.id}>
-                      <div className="flex items-center gap-2 rounded border border-ae-border bg-ae-bg-panel px-3 py-2 hover:bg-ae-bg-secondary">
+                      <div
+                        className="flex items-center gap-2 rounded border border-ae-border bg-ae-bg-panel px-3 py-2 hover:bg-ae-bg-secondary"
+                        onContextMenu={(e) => onPhotoContextMenu(e, photo)}
+                      >
                         <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
                           <input
                             type="checkbox"
@@ -313,6 +367,7 @@ export function ExportPage() {
           </div>
         </aside>
       </div>
+      {contextMenu && <ContextMenu state={contextMenu} onClose={() => setContextMenu(null)} />}
     </div>
   );
 }

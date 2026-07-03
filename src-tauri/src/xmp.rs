@@ -47,8 +47,8 @@ fn crop_to_crs(edits: &EditStack) -> (bool, f32, f32, f32, f32, f32, f32) {
     }
     let left = edits.crop.x;
     let top = edits.crop.y;
-    let right = (1.0 - edits.crop.x - edits.crop.width).max(0.0);
-    let bottom = (1.0 - edits.crop.y - edits.crop.height).max(0.0);
+    let right = (edits.crop.x + edits.crop.width).min(1.0);
+    let bottom = (edits.crop.y + edits.crop.height).min(1.0);
     (
         true,
         top,
@@ -336,15 +336,19 @@ fn parse_crs_sidecar(content: &str) -> EditStack {
     if parse_bool_attr(content, "crs:HasCrop").unwrap_or(false) {
         let top = parse_attr(content, "crs:CropTop").unwrap_or(0.0);
         let left = parse_attr(content, "crs:CropLeft").unwrap_or(0.0);
-        let right = parse_attr(content, "crs:CropRight").unwrap_or(0.0);
-        let bottom = parse_attr(content, "crs:CropBottom").unwrap_or(0.0);
-        edits.crop.enabled = true;
-        edits.crop.x = left.clamp(0.0, 1.0);
-        edits.crop.y = top.clamp(0.0, 1.0);
-        edits.crop.width = (1.0 - left - right).clamp(0.01, 1.0);
-        edits.crop.height = (1.0 - top - bottom).clamp(0.01, 1.0);
-        edits.crop.angle = parse_attr(content, "crs:CropAngle").unwrap_or(0.0);
-        edits.crop.straighten = parse_attr(content, "crs:PerspectiveRotate").unwrap_or(0.0);
+        let right = parse_attr(content, "crs:CropRight").unwrap_or(1.0);
+        let bottom = parse_attr(content, "crs:CropBottom").unwrap_or(1.0);
+        let width = (right - left).max(0.0);
+        let height = (bottom - top).max(0.0);
+        if width >= 0.02 && height >= 0.02 {
+            edits.crop.enabled = true;
+            edits.crop.x = left.clamp(0.0, 1.0);
+            edits.crop.y = top.clamp(0.0, 1.0);
+            edits.crop.width = width.clamp(0.01, 1.0);
+            edits.crop.height = height.clamp(0.01, 1.0);
+            edits.crop.angle = parse_attr(content, "crs:CropAngle").unwrap_or(0.0);
+            edits.crop.straighten = parse_attr(content, "crs:PerspectiveRotate").unwrap_or(0.0);
+        }
     }
 
     edits.transform.rotate = parse_attr(content, "crs:Rotate").unwrap_or(0.0);
@@ -446,8 +450,8 @@ mod tests {
           crs:HasCrop="True"
           crs:CropTop="0.1"
           crs:CropLeft="0.05"
-          crs:CropRight="0.05"
-          crs:CropBottom="0.1"
+          crs:CropRight="0.95"
+          crs:CropBottom="1.0"
           crs:CropAngle="-2.5"
           crs:Sharpness="40"
           crs:SharpenRadius="1.2"
@@ -459,8 +463,26 @@ mod tests {
         assert!(edits.crop.enabled);
         assert!((edits.crop.x - 0.05).abs() < 0.001);
         assert!((edits.crop.width - 0.9).abs() < 0.001);
+        assert!((edits.crop.height - 0.9).abs() < 0.001);
         assert!((edits.detail.sharpening_amount - 40.0).abs() < 0.001);
         assert!((edits.basic.temp - 5200.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn parses_lightroom_corner_crop_coordinates() {
+        let xml = r#"
+        <rdf:Description
+          crs:HasCrop="True"
+          crs:CropLeft="0.237"
+          crs:CropRight="0.967"
+          crs:CropTop="0.236"
+          crs:CropBottom="0.938"
+        />
+        "#;
+        let edits = parse_crs_sidecar(xml);
+        assert!(edits.crop.enabled);
+        assert!((edits.crop.width - 0.73).abs() < 0.01);
+        assert!((edits.crop.height - 0.702).abs() < 0.01);
     }
 
     #[test]

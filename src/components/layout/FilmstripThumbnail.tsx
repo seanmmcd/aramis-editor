@@ -6,14 +6,16 @@ type Props = {
   active?: boolean;
   onSelect: () => void;
   onRemove: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
 };
 
-export function FilmstripThumbnail({ src, alt, active, onSelect, onRemove }: Props) {
+export function FilmstripThumbnail({ src, alt, active, onSelect, onRemove, onContextMenu }: Props) {
   return (
     <div className="relative h-16 w-16 shrink-0">
       <button
         type="button"
         onClick={onSelect}
+        onContextMenu={onContextMenu}
         title={alt}
         className={`h-full w-full overflow-hidden rounded border ${
           active ? "border-ae-accent ring-2 ring-ae-accent" : "border-ae-border"

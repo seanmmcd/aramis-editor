@@ -130,7 +130,7 @@ export const useDevelopStore = create<DevelopState>((set, get) => ({
     }
 
     if (path) {
-      schedulePreviewRefresh({ final: true });
+      schedulePreviewRefresh({ final: true, skipSave: true });
     }
   },
 
@@ -354,7 +354,7 @@ export function endInteractiveEdit() {
   }
 }
 
-export function schedulePreviewRefresh(options?: { final?: boolean }) {
+export function schedulePreviewRefresh(options?: { final?: boolean; skipSave?: boolean }) {
   const isFinal = options?.final === true || interactiveEditCount === 0;
   const debounceMs = isFinal ? PREVIEW_FINAL_DEBOUNCE_MS : PREVIEW_DEBOUNCE_MS;
 
@@ -366,7 +366,9 @@ export function schedulePreviewRefresh(options?: { final?: boolean }) {
     const previewEdits = getPreviewEdits();
     const draft = !isFinal && interactiveEditCount > 0;
 
-    scheduleSaveEdits(photoId, photoPath, edits);
+    if (!options?.skipSave) {
+      scheduleSaveEdits(photoId, photoPath, edits);
+    }
 
     const generation = ++previewGeneration;
     const store = useDevelopStore.getState();

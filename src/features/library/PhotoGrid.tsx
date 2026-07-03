@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import { useNavigate } from "react-router-dom";
+import { ContextMenu, openContextMenu, type ContextMenuState } from "@/components/ContextMenu";
+import { revealFileInExplorer } from "@/lib/revealFile";
 import { useLibraryStore } from "@/stores/useLibraryStore";
 import { useDevelopStore } from "@/stores/useDevelopStore";
+import { syncLibrarySelectionToExportQueue } from "@/stores/useExportStore";
 import { useUIStore } from "@/stores/useUIStore";
 import { useFilmstripSelection } from "./useFilmstripSelection";
 import { thumbnailSrc } from "./thumbnailSrc";
@@ -29,7 +32,7 @@ export function PhotoGrid() {
   const [refreshingThumbs, setRefreshingThumbs] = useState(false);
   const [thumbRefreshPolling, setThumbRefreshPolling] = useState(false);
   const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isSearchMode = searchQuery.trim().length > 0;
@@ -118,11 +121,41 @@ export function PhotoGrid() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [selectedPhotoIds]);
 
-  useEffect(() => {
-    const closeMenu = () => setContextMenu(null);
-    window.addEventListener("click", closeMenu);
-    return () => window.removeEventListener("click", closeMenu);
-  }, []);
+  const onContextMenu = (e: React.MouseEvent, photo: Photo) => {
+    if (!selectedPhotoIds.includes(photo.id)) {
+      setSelectedPhotoIds([photo.id]);
+    }
+    openContextMenu(
+      e,
+      [
+        {
+          label: "Open in Develop",
+          onClick: () => void openInDevelop(photo.id, photo.file_path),
+        },
+        {
+          label: "Add to Export",
+          onClick: () => {
+            syncLibrarySelectionToExportQueue(
+              selectedPhotoIds.includes(photo.id) ? selectedPhotoIds : [photo.id],
+              displayPhotos,
+            );
+            setActiveModule("export");
+            navigate("/export");
+          },
+        },
+        {
+          label: "Reveal in Explorer",
+          onClick: () => void revealFileInExplorer(photo.file_path),
+        },
+        {
+          label: "Remove from library",
+          destructive: true,
+          onClick: () => setConfirmRemoveOpen(true),
+        },
+      ],
+      setContextMenu,
+    );
+  };
 
   const onSearchChange = (value: string) => {
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
@@ -167,14 +200,6 @@ export function PhotoGrid() {
     for (const id of ids) {
       await removePhoto(id);
     }
-  };
-
-  const onContextMenu = (e: React.MouseEvent, photo: Photo) => {
-    e.preventDefault();
-    if (!selectedPhotoIds.includes(photo.id)) {
-      setSelectedPhotoIds([photo.id]);
-    }
-    setContextMenu({ x: e.clientX, y: e.clientY });
   };
 
   const showEmptyFolder = !isSearchMode && selectedFolderId === null;
@@ -236,24 +261,7 @@ export function PhotoGrid() {
         </div>
       )}
 
-      {contextMenu && (
-        <div
-          className="fixed z-50 min-w-[180px] rounded border border-ae-border bg-ae-panel py-1 shadow-lg"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            type="button"
-            className="block w-full px-3 py-1.5 text-left text-sm hover:bg-ae-bg"
-            onClick={() => {
-              setContextMenu(null);
-              setConfirmRemoveOpen(true);
-            }}
-          >
-            Remove from library
-          </button>
-        </div>
-      )}
+      {contextMenu && <ContextMenu state={contextMenu} onClose={() => setContextMenu(null)} />}
 
       {confirmRemoveOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">

@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { open } from "@tauri-apps/plugin-dialog";
 
+import { ContextMenu, openContextMenu, type ContextMenuState } from "@/components/ContextMenu";
 import { CropOverlay } from "@/features/develop/CropOverlay";
+import { revealFileInExplorer } from "@/lib/revealFile";
 
 import type { ImageBounds } from "@/features/develop/CropOverlay";
 
@@ -48,13 +50,16 @@ export function CanvasArea() {
   const isPreviewLoading = useDevelopStore((s) => s.isPreviewLoading);
   const previewError = useDevelopStore((s) => s.previewError);
   const photoPath = useDevelopStore((s) => s.photoPath);
+  const photoId = useDevelopStore((s) => s.photoId);
   const setPhoto = useDevelopStore((s) => s.setPhoto);
   const allEditsEnabled = useDevelopStore((s) => s.allEditsEnabled);
   const toggleAllEdits = useDevelopStore((s) => s.toggleAllEdits);
   const cropMode = useUIStore((s) => s.cropMode);
   const toggleCropMode = useUIStore((s) => s.toggleCropMode);
+  const setExportDialogOpen = useUIStore((s) => s.setExportDialogOpen);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [imageNaturalSize, setImageNaturalSize] = useState({ width: 0, height: 0 });
   const [zoom, setZoom] = useState(1);
@@ -196,6 +201,37 @@ export function CanvasArea() {
     }
   };
 
+  const handlePreviewContextMenu = useCallback(
+    (event: React.MouseEvent) => {
+      if (spaceHeld) {
+        event.preventDefault();
+        return;
+      }
+      if (!photoPath) return;
+      openContextMenu(
+        event,
+        [
+          { label: "Fit to window", onClick: fitToWindow },
+          {
+            label: cropMode ? "Exit crop mode" : "Enter crop mode",
+            onClick: toggleCropMode,
+          },
+          {
+            label: "Quick Export",
+            onClick: () => setExportDialogOpen(true),
+            disabled: photoId == null,
+          },
+          {
+            label: "Reveal in Explorer",
+            onClick: () => void revealFileInExplorer(photoPath),
+          },
+        ],
+        setContextMenu,
+      );
+    },
+    [spaceHeld, photoPath, photoId, cropMode, fitToWindow, toggleCropMode, setExportDialogOpen],
+  );
+
   const panCursor = isPanning ? "grabbing" : spaceHeld ? "grab" : "default";
 
   return (
@@ -237,9 +273,7 @@ export function CanvasArea() {
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         onDoubleClick={fitToWindow}
-        onContextMenu={(event) => {
-          if (spaceHeld) event.preventDefault();
-        }}
+        onContextMenu={handlePreviewContextMenu}
       >
         {!photoPath && <p className="select-none text-sm text-ae-text-secondary">No photo selected</p>}
         {photoPath && !previewDataUrl && !previewError && (
@@ -275,6 +309,7 @@ export function CanvasArea() {
                 event.stopPropagation();
                 fitToWindow();
               }}
+              onContextMenu={handlePreviewContextMenu}
             />
             {cropMode && <CropOverlay bounds={imageBounds} />}
           </div>
@@ -285,6 +320,7 @@ export function CanvasArea() {
           </div>
         )}
       </div>
+      {contextMenu && <ContextMenu state={contextMenu} onClose={() => setContextMenu(null)} />}
     </main>
   );
 }

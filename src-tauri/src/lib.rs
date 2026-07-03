@@ -270,6 +270,11 @@ fn open_export_folder(path: String) -> Result<(), String> {
     tauri_plugin_opener::open_path(path, None::<&str>).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn reveal_file_in_explorer(path: String) -> Result<(), String> {
+    tauri_plugin_opener::reveal_item_in_dir(path).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -306,6 +311,7 @@ pub fn run() {
             export_photo_cmd,
             export_batch_cmd,
             open_export_folder,
+            reveal_file_in_explorer,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

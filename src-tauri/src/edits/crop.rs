@@ -36,9 +36,12 @@ impl Default for CropEdits {
 pub type CropSettings = CropEdits;
 
 pub fn apply_crop(image: DecodedImage, edits: &CropEdits) -> DecodedImage {
+    if !edits.enabled {
+        return image;
+    }
+
     let total_angle = edits.angle + edits.straighten;
-    let is_full = !edits.enabled
-        && edits.x <= 0.001
+    let is_full = edits.x <= 0.001
         && edits.y <= 0.001
         && edits.width >= 0.999
         && edits.height >= 0.999

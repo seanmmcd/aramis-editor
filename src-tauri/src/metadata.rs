@@ -23,20 +23,45 @@ pub fn detect_edits_for_path(path: &Path) -> EditStack {
     edits
 }
 
-/// Fill default edit fields from file metadata (RAW WB, EXIF orientation, default sharpen).
+/// Fill default edit fields from file metadata (RAW WB, default sharpen, crop sanity).
 pub fn enrich_from_metadata(stack: &mut EditStack, path: &Path) {
-    if let Some((temp, tint)) = read_as_shot_white_balance(path) {
+    if let Some((as_shot_temp, as_shot_tint)) = read_as_shot_white_balance(path) {
         if is_default_wb(&stack.basic) {
-            stack.basic.temp = temp;
-            stack.basic.tint = tint;
-            let (bt, bti) = wb_baseline_for_decode(path, temp, tint);
-            stack.basic.wb_baseline_temp = bt;
-            stack.basic.wb_baseline_tint = bti;
+            stack.basic.temp = as_shot_temp;
+            stack.basic.tint = as_shot_tint;
         }
+        let (bt, bti) = wb_baseline_for_decode(path, as_shot_temp, as_shot_tint);
+        stack.basic.wb_baseline_temp = bt;
+        stack.basic.wb_baseline_tint = bti;
     }
     // Do not auto-apply EXIF orientation to transform.rotate — embedded JPEG / image
     // decoders already produce display-oriented pixels; applying rotate again inverts/flips.
     apply_default_sharpening(stack, path);
+    sanitize_crop(stack);
+}
+
+/// Reset invalid or disabled crop rectangles so stale values cannot affect preview.
+fn sanitize_crop(stack: &mut EditStack) {
+    let crop = &mut stack.crop;
+    let degenerate = crop.width < 0.02
+        || crop.height < 0.02
+        || crop.x + crop.width > 1.01
+        || crop.y + crop.height > 1.01;
+
+    if crop.enabled && degenerate {
+        *crop = CropEdits::default();
+        return;
+    }
+
+    if !crop.enabled && !is_default_crop(crop) {
+        crop.x = 0.0;
+        crop.y = 0.0;
+        crop.width = 1.0;
+        crop.height = 1.0;
+        crop.angle = 0.0;
+        crop.straighten = 0.0;
+        crop.aspect_ratio = None;
+    }
 }
 
 fn is_default_wb(basic: &BasicEdits) -> bool {

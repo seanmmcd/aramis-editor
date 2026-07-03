@@ -65,7 +65,7 @@ export function RightPanel() {
     if (preset.value === "original") {
       const patch = {
         aspect_ratio: null as AspectRatio | null,
-        enabled: true,
+        enabled: false,
         x: 0,
         y: 0,
         width: 1,
