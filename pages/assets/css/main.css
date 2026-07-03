@@ -347,9 +347,9 @@ button {
 }
 
 .preview__screen img {
-  width: 50%;
+  width: 65%;
   height: auto;
-  max-height: calc((100dvh - var(--topbar-h) - var(--footbar-h) - 2.5rem) * 0.85);
+  max-height: calc((100dvh - var(--topbar-h) - var(--footbar-h) - 2.5rem) * 1.105);
   object-fit: contain;
 }
 
@@ -433,8 +433,8 @@ button {
   }
 
   .preview__screen img {
-    width: 85%;
-    max-height: 45vh;
+    width: min(100%, 110.5%);
+    max-height: 58.5vh;
   }
 }
 
