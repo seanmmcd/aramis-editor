@@ -1,0 +1,20 @@
+title: Aramis Editor
+description: >-
+  A local-first desktop photo editor for library management, non-destructive
+  develop adjustments, and batch export. Built with Tauri, Rust, and React.
+url: https://aramis.smcd.pw
+baseurl: ""
+lang: en
+
+github_repo: seanmmcd/aramis-editor
+latest_release: v0.1.5
+download_url: https://github.com/seanmmcd/aramis-editor/releases/download/v0.1.5/Aramis.Editor_0.1.5_x64-setup.exe
+releases_url: https://github.com/seanmmcd/aramis-editor/releases
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - README.md
+
+plugins:
+  - jekyll-seo-tag

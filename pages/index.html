@@ -1,0 +1,148 @@
+---
+layout: default
+title: Aramis Editor
+---
+
+<header class="site-header">
+  <div class="container site-header__inner">
+    <a href="#" class="brand">
+      <span class="brand__mark" aria-hidden="true"></span>
+      <span>Aramis Editor</span>
+    </a>
+    <nav class="site-nav" aria-label="Primary">
+      <a href="#features">Features</a>
+      <a href="#screenshots">Screenshots</a>
+      <a href="{{ site.github_repo | prepend: 'https://github.com/' }}">GitHub</a>
+    </nav>
+    <a class="btn btn--primary btn--sm" href="{{ site.download_url }}">
+      Download
+    </a>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="container">
+      <span class="hero__eyebrow">Local-first photo editor</span>
+      <h1 class="hero__title">Edit beautifully.<br><em>Keep everything local.</em></h1>
+      <p class="hero__lead">
+        A desktop photo editor for library management, non-destructive develop
+        adjustments, and batch export — built with Tauri, Rust, and React.
+        Your photos never leave your machine.
+      </p>
+      <div class="hero__actions">
+        <a class="btn btn--primary" href="{{ site.download_url }}">
+          Download for Windows
+        </a>
+        <a class="btn btn--ghost" href="{{ site.releases_url }}">
+          All releases
+        </a>
+      </div>
+      <p class="hero__meta">Latest release: {{ site.latest_release }} · Windows x64</p>
+    </div>
+  </section>
+
+  <section class="showcase" id="screenshots">
+    <div class="container">
+      <div class="showcase__frame">
+        <div class="showcase__tabs" role="tablist" aria-label="App screenshots">
+          <button class="showcase__tab is-active" role="tab" aria-selected="true" data-showcase-tab="library">Library</button>
+          <button class="showcase__tab" role="tab" aria-selected="false" data-showcase-tab="develop">Develop</button>
+          <button class="showcase__tab" role="tab" aria-selected="false" data-showcase-tab="export">Export</button>
+        </div>
+        <div class="showcase__screens">
+          <figure class="showcase__screen is-active" data-showcase-screen="library">
+            <img src="{{ '/assets/images/screenshots/01-library.png' | relative_url }}" alt="Aramis Editor Library view showing photo thumbnails and folder navigation" width="1296" height="839" loading="eager">
+          </figure>
+          <figure class="showcase__screen" data-showcase-screen="develop">
+            <img src="{{ '/assets/images/screenshots/02-develop.png' | relative_url }}" alt="Aramis Editor Develop view with non-destructive editing panels" width="1296" height="839" loading="lazy">
+          </figure>
+          <figure class="showcase__screen" data-showcase-screen="export">
+            <img src="{{ '/assets/images/screenshots/03-export.png' | relative_url }}" alt="Aramis Editor Export view with batch export settings" width="1296" height="839" loading="lazy">
+          </figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="features" id="features">
+    <div class="container">
+      <span class="section-label">Features</span>
+      <h2 class="section-title">Everything you need to develop photos</h2>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <div class="feature-card__icon" aria-hidden="true">📁</div>
+          <h3>Library</h3>
+          <p>Import folders, browse photos with thumbnails, search your entire catalog, and view EXIF metadata.</p>
+        </article>
+        <article class="feature-card">
+          <div class="feature-card__icon" aria-hidden="true">◐</div>
+          <h3>Develop</h3>
+          <p>Non-destructive editing with Basic, Tone Curve, HSL, Calibration, Crop, Transform, Lens, Detail, and Effects.</p>
+        </article>
+        <article class="feature-card">
+          <div class="feature-card__icon" aria-hidden="true">◎</div>
+          <h3>RAW support</h3>
+          <p>Edit CR2, NEF, ARW, DNG, and more. Full raw pipeline powered by rawloader.</p>
+        </article>
+        <article class="feature-card">
+          <div class="feature-card__icon" aria-hidden="true">↺</div>
+          <h3>History &amp; presets</h3>
+          <p>Save and recall edit states with presets, checkpoints, and a full edit history in a SQLite catalog.</p>
+        </article>
+        <article class="feature-card">
+          <div class="feature-card__icon" aria-hidden="true">✦</div>
+          <h3>Spot heal</h3>
+          <p>Remove distractions with spot healing tools integrated into the develop workflow.</p>
+        </article>
+        <article class="feature-card">
+          <div class="feature-card__icon" aria-hidden="true">↗</div>
+          <h3>Export</h3>
+          <p>Batch export to JPEG, PNG, or TIFF with quality, resize, and upscale options.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="privacy">
+    <div class="container">
+      <div class="privacy__inner">
+        <div class="privacy__text">
+          <h2>Your photos stay yours</h2>
+          <p>Aramis Editor runs entirely on your machine. No cloud uploads, no telemetry, no accounts required.</p>
+        </div>
+        <ul class="privacy__points">
+          <li>Local catalog &amp; thumbnails</li>
+          <li>XMP sidecar support</li>
+          <li>Open source (MIT)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="download" id="download">
+    <div class="container">
+      <div class="download__box">
+        <h2>Ready to edit?</h2>
+        <p>Download the latest Windows installer and start organizing, developing, and exporting your photos today.</p>
+        <a class="btn btn--primary" href="{{ site.download_url }}">
+          Download {{ site.latest_release }}
+        </a>
+        <p class="download__version">
+          <a href="{{ site.releases_url }}">View release notes on GitHub</a>
+        </p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="container site-footer__inner">
+    <span>&copy; {{ site.time | date: '%Y' }} Aramis Editor</span>
+    <span>
+      <a href="{{ site.github_repo | prepend: 'https://github.com/' }}">Source code</a>
+      &nbsp;·&nbsp;
+      <a href="{{ site.releases_url }}">Releases</a>
+    </span>
+  </div>
+</footer>
