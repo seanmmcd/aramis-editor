@@ -71,7 +71,7 @@ docs/             Architecture notes
 scripts/          Launch and setup helpers
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for module layout, edit pipeline, and roadmap.
+See [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md) for module layout, edit pipeline, and roadmap.
 
 ## Privacy
 
