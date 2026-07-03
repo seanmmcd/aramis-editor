@@ -7,8 +7,8 @@ const BASIC_INTENSITY: f32 = 0.1;
 /// EV adjustment in linear space, luminance-weighted (preserves chroma).
 /// Strength tuned below full slider range so ±1 EV feels natural in the UI.
 const EXPOSURE_STRENGTH: f32 = 0.55 * BASIC_INTENSITY;
-/// Slightly stronger than other basic sliders; contrast felt too subtle at full slider.
-const CONTRAST_STRENGTH: f32 = 0.2;
+/// Stronger than other basic sliders; tuned for visible contrast at typical slider values.
+const CONTRAST_STRENGTH: f32 = 0.35;
 const SHADOWS_STRENGTH: f32 = 0.55;
 const HIGHLIGHTS_STRENGTH: f32 = 0.75;
 const HIGHLIGHTS_AMOUNT: f32 = 0.55;
@@ -45,9 +45,9 @@ pub fn apply_contrast(p: &mut [f32], amount: f32) {
     }
     let n = amount / 100.0 * CONTRAST_STRENGTH;
     let factor = if n >= 0.0 {
-        1.0 + n * 0.95
+        1.0 + n * 1.05
     } else {
-        1.0 / (1.0 - n * 0.5)
+        1.0 / (1.0 - n * 0.55)
     };
     const PIVOT: f32 = 0.18;
     for c in p.iter_mut() {
