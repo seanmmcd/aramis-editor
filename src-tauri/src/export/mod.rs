@@ -2,13 +2,15 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use image::{ImageFormat, RgbImage};
+use rayon::prelude::*;
+use rayon::ThreadPoolBuilder;
 
 use crate::jpeg_encode;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::editor::Editor;
-use crate::edits::{apply_geometry_edits, apply_pixel_edits, EditStack};
+use crate::edits::{apply_geometry_edits, apply_pixel_edits, apply_spot_heal, EditStack};
 use crate::metadata::enrich_from_metadata;
 use crate::raw::{
     decode_image_on_large_stack, linear_rgb_to_srgb_bytes, resize_for_export,
@@ -44,7 +46,7 @@ pub enum ResizeMode {
     Dimensions,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct ExportSettings {
     pub format: ExportFormat,
@@ -57,6 +59,23 @@ pub struct ExportSettings {
     pub upscale_factor: UpscaleFactor,
     pub output_folder: String,
     pub filename_template: String,
+}
+
+impl Default for ExportSettings {
+    fn default() -> Self {
+        Self {
+            format: ExportFormat::default(),
+            quality: 90,
+            color_space: ColorSpace::default(),
+            resize_mode: ResizeMode::default(),
+            long_edge: 2048,
+            width: 1920,
+            height: 1080,
+            upscale_factor: UpscaleFactor::default(),
+            output_folder: String::new(),
+            filename_template: "{filename}_edited".into(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -91,7 +110,16 @@ pub fn export_photo(
     edits: &EditStack,
     settings: &ExportSettings,
 ) -> Result<ExportResult, String> {
-    let mut decoded = decode_image_on_large_stack(path).map_err(|e| e.to_string())?;
+    export_photo_with_mode(path, edits, settings, true)
+}
+
+fn export_photo_with_mode(
+    path: &Path,
+    edits: &EditStack,
+    settings: &ExportSettings,
+    single_photo: bool,
+) -> Result<ExportResult, String> {
+    let decoded = decode_image_on_large_stack(path).map_err(|e| e.to_string())?;
     let mut edits = edits.clone();
     enrich_from_metadata(&mut edits, path);
 
@@ -99,9 +127,9 @@ pub fn export_photo(
     if let Some((nw, nh)) = export_work_dimensions(&working, settings) {
         working = downscale_for_export(working, nw, nh, settings);
     }
-    let rendered = apply_pixel_edits(working, &edits);
+    let rendered = apply_spot_heal(apply_pixel_edits(working, &edits), &edits.spot_heal);
     let upscaled = upscale_image(&rendered, settings.upscale_factor).map_err(|e| e.to_string())?;
-    let output_path = build_output_path(path, settings)?;
+    let output_path = build_output_path(path, settings, single_photo)?;
     write_image(&upscaled, &output_path, path, settings)?;
     Ok(ExportResult {
         output_path: output_path.to_string_lossy().into_owned(),
@@ -110,53 +138,82 @@ pub fn export_photo(
     })
 }
 
+fn export_thread_pool(thread_count: usize) -> rayon::ThreadPool {
+    ThreadPoolBuilder::new()
+        .num_threads(thread_count.max(1))
+        .thread_name(|i| format!("export-{i}"))
+        .build()
+        .unwrap_or_else(|_| ThreadPoolBuilder::new().build().expect("export thread pool"))
+}
+
 pub fn export_batch(
     editor: &Editor,
     photo_ids: &[i64],
     settings: &ExportSettings,
+    thread_count: usize,
 ) -> BatchExportResult {
-    let mut items = Vec::with_capacity(photo_ids.len());
-    let mut succeeded = 0u32;
-    let mut failed = 0u32;
+    let mut prepared: Vec<(i64, Result<(String, EditStack), String>)> =
+        Vec::with_capacity(photo_ids.len());
 
     for &photo_id in photo_ids {
-        match editor.get_photo_path(photo_id) {
+        let item = match editor.get_photo_path(photo_id) {
             Ok(path) => match editor.get_edits(photo_id) {
-                Ok(edits) => match export_photo(Path::new(&path), &edits, settings) {
-                    Ok(result) => {
-                        succeeded += 1;
-                        items.push(BatchExportItem {
-                            photo_id,
-                            result: Some(result),
-                            error: None,
-                        });
-                    }
-                    Err(e) => {
-                        failed += 1;
-                        items.push(BatchExportItem {
-                            photo_id,
-                            result: None,
-                            error: Some(e),
-                        });
-                    }
-                },
-                Err(e) => {
-                    failed += 1;
-                    items.push(BatchExportItem {
-                        photo_id,
-                        result: None,
-                        error: Some(e.to_string()),
-                    });
-                }
+                Ok(edits) => Ok((path, edits)),
+                Err(e) => Err(e.to_string()),
             },
-            Err(e) => {
-                failed += 1;
-                items.push(BatchExportItem {
-                    photo_id,
+            Err(e) => Err(e.to_string()),
+        };
+        prepared.push((photo_id, item));
+    }
+
+    export_batch_prepared(&prepared, settings, thread_count)
+}
+
+pub fn export_batch_prepared(
+    prepared: &[(i64, Result<(String, EditStack), String>)],
+    settings: &ExportSettings,
+    thread_count: usize,
+) -> BatchExportResult {
+    let single_photo = prepared.len() == 1;
+    let settings = settings.clone();
+    let pool = export_thread_pool(thread_count);
+    let items: Vec<BatchExportItem> = pool.install(|| {
+        prepared
+            .par_iter()
+            .map(|(photo_id, prepared)| match prepared {
+                Ok((path, edits)) => match export_photo_with_mode(
+                    Path::new(path),
+                    edits,
+                    &settings,
+                    single_photo,
+                ) {
+                    Ok(result) => BatchExportItem {
+                        photo_id: *photo_id,
+                        result: Some(result),
+                        error: None,
+                    },
+                    Err(e) => BatchExportItem {
+                        photo_id: *photo_id,
+                        result: None,
+                        error: Some(e),
+                    },
+                },
+                Err(e) => BatchExportItem {
+                    photo_id: *photo_id,
                     result: None,
-                    error: Some(e.to_string()),
-                });
-            }
+                    error: Some(e.clone()),
+                },
+            })
+            .collect()
+    });
+
+    let mut succeeded = 0u32;
+    let mut failed = 0u32;
+    for item in &items {
+        if item.result.is_some() {
+            succeeded += 1;
+        } else {
+            failed += 1;
         }
     }
 
@@ -210,11 +267,23 @@ fn downscale_for_export(
     }
 }
 
-fn build_output_path(source: &Path, settings: &ExportSettings) -> Result<PathBuf, String> {
-    if settings.output_folder.is_empty() {
-        return Err("output folder is required".into());
-    }
-    fs::create_dir_all(&settings.output_folder).map_err(|e| e.to_string())?;
+fn build_output_path(
+    source: &Path,
+    settings: &ExportSettings,
+    single_photo: bool,
+) -> Result<PathBuf, String> {
+    let output_dir = if single_photo {
+        let parent = source
+            .parent()
+            .ok_or_else(|| "source image has no parent folder".to_string())?;
+        parent.join("Exports")
+    } else if settings.output_folder.is_empty() {
+        return Err("output folder is required for batch export".into());
+    } else {
+        PathBuf::from(&settings.output_folder)
+    };
+
+    fs::create_dir_all(&output_dir).map_err(|e| e.to_string())?;
     let stem = source
         .file_stem()
         .and_then(|s| s.to_str())
@@ -224,7 +293,7 @@ fn build_output_path(source: &Path, settings: &ExportSettings) -> Result<PathBuf
         .replace("{filename}", stem)
         .replace("{original}", stem);
     let ext = output_extension(source, settings.format);
-    Ok(PathBuf::from(&settings.output_folder).join(format!("{name}.{ext}")))
+    Ok(output_dir.join(format!("{name}.{ext}")))
 }
 
 fn output_extension(source: &Path, format: ExportFormat) -> String {
@@ -286,7 +355,7 @@ fn apply_color_space(rgb: &mut [u8], space: ColorSpace) {
     if matches!(space, ColorSpace::Srgb) {
         return;
     }
-    for px in rgb.chunks_exact_mut(3) {
+    rgb.par_chunks_exact_mut(3).for_each(|px| {
         let (r, g, b) = (
             px[0] as f32 / 255.0,
             px[1] as f32 / 255.0,
@@ -308,6 +377,6 @@ fn apply_color_space(rgb: &mut [u8], space: ColorSpace) {
         px[0] = (nr.clamp(0.0, 1.0) * 255.0).round() as u8;
         px[1] = (ng.clamp(0.0, 1.0) * 255.0).round() as u8;
         px[2] = (nb.clamp(0.0, 1.0) * 255.0).round() as u8;
-    }
+    });
 }
 

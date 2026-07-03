@@ -2,9 +2,13 @@ use crate::raw::DecodedImage;
 
 use super::{
     apply_basic, apply_calibration, apply_color_grading, apply_crop, apply_detail,
-    apply_detail_preview, apply_effects, apply_hsl, apply_lens, apply_tone_curve,
-    apply_transform, EditStack,
+    apply_detail_preview, apply_effects, apply_hsl, apply_lens, apply_spot_heal,
+    apply_tone_curve, apply_transform, EditStack,
 };
+
+fn finish_stack(image: DecodedImage, stack: &EditStack) -> DecodedImage {
+    apply_spot_heal(image, &stack.spot_heal)
+}
 
 /// Lens, transform, and crop — must run at full decode resolution.
 pub fn apply_geometry_edits(mut image: DecodedImage, stack: &EditStack) -> DecodedImage {
@@ -30,9 +34,8 @@ pub fn apply_pixel_edits(image: DecodedImage, stack: &EditStack) -> DecodedImage
     DecodedImage { width, height, data }
 }
 
-pub fn apply_edit_stack(mut image: DecodedImage, stack: &EditStack) -> DecodedImage {
-    image = apply_geometry_edits(image, stack);
-    apply_pixel_edits(image, stack)
+pub fn apply_edit_stack(image: DecodedImage, stack: &EditStack) -> DecodedImage {
+    finish_stack(apply_pixel_edits(apply_geometry_edits(image, stack), stack), stack)
 }
 
 /// Fast path for interactive preview — sharpening at preview resolution; skips noise reduction.
@@ -53,7 +56,7 @@ pub fn apply_edit_stack_preview(mut image: DecodedImage, stack: &EditStack) -> D
     apply_detail_preview(&mut data, width, height, &stack.detail);
     apply_effects(&mut data, width, height, &stack.effects);
 
-    DecodedImage { width, height, data }
+    finish_stack(DecodedImage { width, height, data }, stack)
 }
 
 /// Full-quality develop preview without crop (crop overlay mode).
@@ -73,7 +76,7 @@ pub fn apply_edit_stack_skip_crop(mut image: DecodedImage, stack: &EditStack) ->
     apply_detail(&mut data, width, height, &stack.detail);
     apply_effects(&mut data, width, height, &stack.effects);
 
-    DecodedImage { width, height, data }
+    finish_stack(DecodedImage { width, height, data }, stack)
 }
 
 /// Interactive preview while adjusting crop — same as preview path but leaves full frame visible.
@@ -93,5 +96,5 @@ pub fn apply_edit_stack_preview_skip_crop(mut image: DecodedImage, stack: &EditS
     apply_detail_preview(&mut data, width, height, &stack.detail);
     apply_effects(&mut data, width, height, &stack.effects);
 
-    DecodedImage { width, height, data }
+    finish_stack(DecodedImage { width, height, data }, stack)
 }

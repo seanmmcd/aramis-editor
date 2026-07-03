@@ -8,6 +8,7 @@ export function AppRoutes() {
       <Route path="/library" element={<AppShell view="library" />} />
       <Route path="/develop" element={<AppShell view="develop" />} />
       <Route path="/export" element={<AppShell view="export" />} />
+      <Route path="/settings" element={<AppShell view="settings" />} />
     </Routes>
   );
 }

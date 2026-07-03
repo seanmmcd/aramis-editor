@@ -10,6 +10,7 @@ mod detail;
 mod effects;
 mod hsl;
 mod lens;
+mod spot_heal;
 mod stack;
 mod tone_curve;
 mod transform;
@@ -24,6 +25,7 @@ pub use detail::{apply_detail, apply_detail_preview, apply_preview_sharpen_compe
 pub use effects::{apply_effects, EffectsEdits};
 pub use hsl::{apply_hsl, HslEdits};
 pub use lens::{apply_lens, LensEdits};
+pub use spot_heal::{apply_spot_heal, HealSpot, SpotHealEdits, SpotHealMode};
 pub use stack::{
     apply_edit_stack, apply_edit_stack_preview, apply_edit_stack_preview_skip_crop,
     apply_edit_stack_skip_crop, apply_geometry_edits, apply_pixel_edits,
@@ -46,10 +48,22 @@ pub struct EditStack {
     pub lens: LensEdits,
     pub detail: DetailEdits,
     pub effects: EffectsEdits,
+    pub spot_heal: SpotHealEdits,
 }
 
 impl EditStack {
     pub fn describe_change(from: &Self, to: &Self) -> String {
+        if from.spot_heal != to.spot_heal {
+            let added = to.spot_heal.spots.len().saturating_sub(from.spot_heal.spots.len());
+            let removed = from.spot_heal.spots.len().saturating_sub(to.spot_heal.spots.len());
+            if added > 0 {
+                return format!("Spot heal (+{added})");
+            }
+            if removed > 0 {
+                return format!("Spot heal (-{removed})");
+            }
+            return "Spot heal".into();
+        }
         if from.crop != to.crop {
             return "Crop".into();
         }

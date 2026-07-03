@@ -1,6 +1,7 @@
 export type Folder = {
   id: number;
   path: string;
+  parent_id: number | null;
   added_at: string;
   photo_count: number;
 };

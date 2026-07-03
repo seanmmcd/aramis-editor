@@ -2,13 +2,36 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --ae-highlight: #2d8ceb;
+  --ae-accent: var(--ae-highlight);
+  --ae-selection-bg: rgba(45, 140, 235, 0.18);
+  --ae-bg: #1a1a1a;
   --ae-bg-primary: #1e1e1e;
   --ae-bg-secondary: #2d2d2d;
   --ae-bg-panel: #393939;
+  --ae-panel: #242424;
   --ae-border: #4a4a4a;
-  --ae-text-secondary: #999;
-  --ae-accent: #2d8ceb;
+  --ae-text: #e8e8e8;
+  --ae-text-primary: #d4d4d4;
+  --ae-text-secondary: #999999;
+  --ae-muted: #9a9a9a;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --ae-bg: #e8e8e8;
+  --ae-bg-primary: #f3f3f3;
+  --ae-bg-secondary: #ffffff;
+  --ae-bg-panel: #e9e9e9;
+  --ae-panel: #fafafa;
+  --ae-border: #c8c8c8;
+  --ae-text: #1a1a1a;
+  --ae-text-primary: #1e1e1e;
+  --ae-text-secondary: #5c5c5c;
+  --ae-muted: #6b6b6b;
 }
 
 html,
@@ -20,7 +43,7 @@ body,
 
 body {
   background: var(--ae-bg-primary);
-  color: #d4d4d4;
+  color: var(--ae-text-primary);
   font-family: system-ui, Segoe UI, sans-serif;
 }
 
@@ -49,4 +72,61 @@ body {
 
 *::-webkit-scrollbar-corner {
   background: var(--ae-bg-primary);
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--ae-accent);
+}
+
+input[type="range"].ae-slider {
+  height: 4px;
+  cursor: pointer;
+  appearance: none;
+  background: transparent;
+}
+
+input[type="range"].ae-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--ae-border);
+}
+
+input[type="range"].ae-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border-radius: 50%;
+  border: 2px solid var(--ae-bg-primary);
+  background: var(--ae-accent);
+  cursor: pointer;
+}
+
+input[type="range"].ae-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--ae-border);
+}
+
+input[type="range"].ae-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--ae-bg-primary);
+  background: var(--ae-accent);
+  cursor: pointer;
+}
+
+input[type="range"].ae-slider:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+input[type="range"].ae-slider:disabled::-webkit-slider-thumb {
+  cursor: not-allowed;
+}
+
+input[type="range"].ae-slider:disabled::-moz-range-thumb {
+  cursor: not-allowed;
 }

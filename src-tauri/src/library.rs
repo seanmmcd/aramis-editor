@@ -1,6 +1,6 @@
 ﻿use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex, OnceLock};
 
 use chrono::Utc;
 use exif::{In, Reader, Tag};
@@ -8,11 +8,11 @@ use thiserror::Error;
 use walkdir::WalkDir;
 
 use crate::catalog::{Catalog, FolderRow, PhotoRow};
-use crate::raw::{embedded_jpeg, jpeg_backend, rawloader_backend, read_dimensions};
+use crate::raw::{embedded_jpeg, jpeg_backend, rawloader_backend};
 
 const THUMB_MAX: u32 = 200;
 const THUMB_JPEG_QUALITY: u8 = 65;
-const THUMB_WORKERS: usize = 8;
+const THUMB_WORKERS: usize = 4;
 
 #[derive(Debug, Error)]
 pub enum LibraryError {
@@ -51,6 +51,7 @@ impl Library {
         thumb_dir: PathBuf,
     ) -> Result<Self, LibraryError> {
         fs::create_dir_all(&thumb_dir)?;
+        init_thumbnail_workers(catalog_db_path.clone());
         Ok(Self {
             catalog,
             catalog_db_path,
@@ -63,7 +64,7 @@ impl Library {
     }
 
     pub fn import_folder(&self, path: String) -> Result<ImportResult, LibraryError> {
-        import_folder(&self.catalog, &self.catalog_db_path, &path).map_err(Into::into)
+        import_folder(&self.catalog, &path).map_err(Into::into)
     }
 
     pub fn list_photos(&self, folder_id: Option<i64>) -> Result<Vec<PhotoRow>, LibraryError> {
@@ -91,6 +92,14 @@ impl Library {
             &self.catalog,
             &self.catalog_db_path,
             folder_id,
+        )?)
+    }
+
+    pub fn generate_thumbnails(&self, photo_ids: Vec<i64>) -> Result<u32, LibraryError> {
+        Ok(enqueue_thumbnails(
+            &self.catalog,
+            &self.catalog_db_path,
+            photo_ids,
         )?)
     }
 }
@@ -210,80 +219,109 @@ pub fn generate_thumbnail(photo_id: i64, source: &Path, out_dir: &Path) -> anyho
     Ok(out_path.to_string_lossy().into_owned())
 }
 
+static THUMB_QUEUE: OnceLock<mpsc::Sender<(PathBuf, i64, PathBuf)>> = OnceLock::new();
+
+fn init_thumbnail_workers(_catalog_db_path: PathBuf) {
+    THUMB_QUEUE.get_or_init(|| {
+        let (tx, rx) = mpsc::channel::<(PathBuf, i64, PathBuf)>();
+        let rx = Arc::new(Mutex::new(rx));
+        let thumb_dir = thumbnails_dir();
+        let _ = fs::create_dir_all(&thumb_dir);
+
+        for i in 0..THUMB_WORKERS {
+            let rx = Arc::clone(&rx);
+            let out = thumb_dir.clone();
+            std::thread::Builder::new()
+                .name(format!("thumb-worker-{i}"))
+                .spawn(move || loop {
+                    let job = {
+                        let guard = rx.lock().unwrap();
+                        guard.recv().ok()
+                    };
+                    let Some((db_path, photo_id, source)) = job else {
+                        break;
+                    };
+                    if let Ok(catalog) = Catalog::open(&db_path) {
+                        if let Ok(thumb) = generate_thumbnail(photo_id, &source, &out) {
+                            let _ = catalog.set_thumbnail(photo_id, &thumb);
+                        }
+                    }
+                })
+                .ok();
+        }
+        tx
+    });
+}
+
+fn enqueue_thumbnail_jobs(catalog_db_path: &Path, jobs: Vec<(i64, PathBuf)>) -> u32 {
+    if jobs.is_empty() {
+        return 0;
+    }
+    init_thumbnail_workers(catalog_db_path.to_path_buf());
+    let tx = THUMB_QUEUE.get().expect("thumbnail workers initialized");
+    let db_path = catalog_db_path.to_path_buf();
+    let count = jobs.len() as u32;
+    for (photo_id, source) in jobs {
+        let _ = tx.send((db_path.clone(), photo_id, source));
+    }
+    count
+}
+
+fn enqueue_thumbnails(
+    catalog: &Catalog,
+    catalog_db_path: &Path,
+    photo_ids: Vec<i64>,
+) -> anyhow::Result<u32> {
+    let jobs: Vec<(i64, PathBuf)> = catalog
+        .photos_missing_thumbnails(&photo_ids)?
+        .into_iter()
+        .map(|(id, path)| (id, PathBuf::from(path)))
+        .collect();
+    Ok(enqueue_thumbnail_jobs(catalog_db_path, jobs))
+}
+
 fn refresh_folder_thumbnails(
     catalog: &Catalog,
     catalog_db_path: &Path,
     folder_id: i64,
 ) -> anyhow::Result<u32> {
-    let photos = catalog.list_photos(Some(folder_id))?;
-    let jobs: Vec<(i64, PathBuf)> = photos
-        .iter()
-        .map(|p| (p.id, PathBuf::from(&p.file_path)))
+    let photo_ids: Vec<i64> = catalog
+        .list_photos(Some(folder_id))?
+        .into_iter()
+        .filter(|p| p.thumbnail_path.is_none())
+        .map(|p| p.id)
         .collect();
-    let count = jobs.len() as u32;
-    spawn_thumbnail_jobs(catalog_db_path.to_path_buf(), jobs);
-    Ok(count)
+    enqueue_thumbnails(catalog, catalog_db_path, photo_ids)
 }
 
-fn spawn_thumbnail_jobs(catalog_db_path: PathBuf, jobs: Vec<(i64, PathBuf)>) {
-    if jobs.is_empty() {
-        return;
+fn parent_folder_id(catalog: &Catalog, dir_path: &Path, root: &Path) -> anyhow::Result<Option<i64>> {
+    if dir_path == root {
+        return Ok(None);
     }
-    let thumb_dir = thumbnails_dir();
-    let _ = fs::create_dir_all(&thumb_dir);
-    let worker_count = THUMB_WORKERS.min(jobs.len());
-    let (job_tx, job_rx) = std::sync::mpsc::channel();
-    for job in jobs {
-        let _ = job_tx.send(job);
-    }
-    drop(job_tx);
-    let job_rx = Arc::new(Mutex::new(job_rx));
-
-    for i in 0..worker_count {
-        let rx = Arc::clone(&job_rx);
-        let db = catalog_db_path.clone();
-        let out = thumb_dir.clone();
-        std::thread::Builder::new()
-            .name(format!("thumb-worker-{i}"))
-            .spawn(move || {
-                let catalog = match Catalog::open(&db) {
-                    Ok(c) => c,
-                    Err(_) => return,
-                };
-                loop {
-                    let job = {
-                        let guard = rx.lock().unwrap();
-                        guard.recv().ok()
-                    };
-                    let Some((photo_id, source)) = job else {
-                        break;
-                    };
-                    if let Ok(thumb) = generate_thumbnail(photo_id, &source, &out) {
-                        let _ = catalog.set_thumbnail(photo_id, &thumb);
-                    }
-                }
-            })
-            .ok();
-    }
+    let parent_path = dir_path
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("directory has no parent: {}", dir_path.display()))?
+        .to_string_lossy()
+        .into_owned();
+    catalog
+        .get_folder_id_by_path(&parent_path)?
+        .ok_or_else(|| anyhow::anyhow!("parent folder not indexed: {parent_path}"))
+        .map(Some)
 }
 
-pub fn import_folder(
+fn import_files_in_dir(
     catalog: &Catalog,
-    catalog_db_path: &Path,
-    folder_path: &str,
-) -> anyhow::Result<ImportResult> {
-    let path = PathBuf::from(folder_path);
-    if !path.is_dir() {
-        anyhow::bail!("not a directory: {folder_path}");
-    }
-    let now = Utc::now().to_rfc3339();
-    let folder_id = catalog.upsert_folder(folder_path, &now)?;
+    folder_id: i64,
+    dir_path: &Path,
+    now: &str,
+) -> anyhow::Result<(u32, u32)> {
     let mut imported = 0u32;
     let mut skipped = 0u32;
-    let mut pending_thumbs = Vec::new();
-    for entry in WalkDir::new(&path).into_iter().filter_map(|e| e.ok()) {
+
+    for entry in fs::read_dir(dir_path)? {
+        let entry = entry?;
         let entry_path = entry.path();
-        if !entry_path.is_file() || !is_supported(entry_path) {
+        if !entry_path.is_file() || !is_supported(&entry_path) {
             continue;
         }
         let file_path = entry_path.to_string_lossy().into_owned();
@@ -295,33 +333,50 @@ pub fn import_folder(
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_default();
-        let file_size = fs::metadata(entry_path).ok().map(|m| m.len() as i64);
-        let exif = read_exif(entry_path);
-        let (width, height) = if let (Some(w), Some(h)) = (exif.width, exif.height) {
-            (Some(w), Some(h))
-        } else if let Ok((w, h)) = read_dimensions(entry_path) {
-            (Some(w as i32), Some(h as i32))
-        } else {
-            (None, None)
-        };
-        let photo_id = catalog.insert_photo(
+        let file_size = entry.metadata().ok().map(|m| m.len() as i64);
+        catalog.insert_photo(
             folder_id,
             &file_path,
             &file_name,
             file_size,
-            width,
-            height,
-            exif.capture_date.as_deref(),
-            exif.camera_make.as_deref(),
-            exif.camera_model.as_deref(),
-            &now,
+            None,
+            None,
+            None,
+            None,
+            None,
+            now,
         )?;
-        pending_thumbs.push((photo_id, entry_path.to_path_buf()));
         imported += 1;
     }
-    spawn_thumbnail_jobs(catalog_db_path.to_path_buf(), pending_thumbs);
+
+    Ok((imported, skipped))
+}
+
+pub fn import_folder(catalog: &Catalog, folder_path: &str) -> anyhow::Result<ImportResult> {
+    let root = PathBuf::from(folder_path);
+    if !root.is_dir() {
+        anyhow::bail!("not a directory: {folder_path}");
+    }
+    let now = Utc::now().to_rfc3339();
+    let root_id = catalog.upsert_folder(folder_path, None, &now)?;
+    let mut imported = 0u32;
+    let mut skipped = 0u32;
+
+    for entry in WalkDir::new(&root).into_iter().filter_map(|e| e.ok()) {
+        if !entry.file_type().is_dir() {
+            continue;
+        }
+        let dir_path = entry.path();
+        let dir_path_str = dir_path.to_string_lossy().into_owned();
+        let parent_id = parent_folder_id(catalog, dir_path, &root)?;
+        let folder_id = catalog.upsert_folder(&dir_path_str, parent_id, &now)?;
+        let (dir_imported, dir_skipped) = import_files_in_dir(catalog, folder_id, dir_path, &now)?;
+        imported += dir_imported;
+        skipped += dir_skipped;
+    }
+
     Ok(ImportResult {
-        folder_id,
+        folder_id: root_id,
         imported,
         skipped,
     })

@@ -1,4 +1,5 @@
 import { beginInteractiveEdit, endInteractiveEdit } from "@/stores/useDevelopStore";
+import { isRangeThumbHit } from "@/lib/slider";
 
 interface SliderControlProps {
   label: string;
@@ -29,6 +30,17 @@ export function SliderControl({
     onChange?.(resetValue);
   };
 
+  const tryThumbReset = (event: React.PointerEvent<HTMLInputElement>) => {
+    if (disabled) return false;
+    if (!isRangeThumbHit(event.currentTarget, event.clientX)) return false;
+    if (event.detail >= 2) {
+      event.preventDefault();
+      handleReset();
+      return true;
+    }
+    return false;
+  };
+
   const displayValue = formatValue
     ? formatValue(value)
     : step < 1
@@ -38,7 +50,7 @@ export function SliderControl({
         : `${Math.round(value)}`;
 
   return (
-    <div className={`flex flex-col gap-1 ${disabled ? "opacity-50" : ""}`} title="Double-click to reset">
+    <div className={`flex flex-col gap-1 ${disabled ? "opacity-50" : ""}`}>
       <div
         className="flex cursor-default select-none items-center justify-between"
         onDoubleClick={(event) => {
@@ -58,21 +70,24 @@ export function SliderControl({
         step={step}
         value={value}
         disabled={disabled}
+        title="Double-click thumb to reset"
         onChange={(event) => onChange?.(Number(event.target.value))}
         onPointerDown={(event) => {
           if (disabled) return;
-          // Range inputs often skip dblclick in WebView2; detail === 2 is the second mousedown.
-          if (event.detail >= 2) {
-            event.preventDefault();
-            handleReset();
-            return;
-          }
+          if (tryThumbReset(event)) return;
           beginInteractiveEdit();
         }}
         onPointerUp={() => endInteractiveEdit()}
         onPointerCancel={() => endInteractiveEdit()}
+        onDoubleClick={(event) => {
+          if (disabled) return;
+          if (isRangeThumbHit(event.currentTarget, event.clientX)) {
+            event.preventDefault();
+            handleReset();
+          }
+        }}
         aria-label={label}
-        className="h-1 w-full cursor-pointer appearance-none rounded-full bg-ae-border accent-ae-accent disabled:cursor-not-allowed"
+        className="ae-slider w-full cursor-pointer disabled:cursor-not-allowed"
       />
     </div>
   );

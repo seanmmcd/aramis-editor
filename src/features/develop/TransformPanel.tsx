@@ -36,9 +36,14 @@ export function TransformPanel() {
       {!photoPath && (
         <p className="text-xs text-ae-text-secondary">Select a photo to adjust transform.</p>
       )}
-      <div>
-        <p className="mb-1.5 text-xs text-ae-text-secondary">Rotate</p>
-        <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs text-ae-text-secondary">
+          Rotate
+          {transform.rotate !== 0 && (
+            <span className="ml-1 text-ae-muted">({Math.round(transform.rotate)}°)</span>
+          )}
+        </p>
+        <div className="flex items-center gap-1.5">
           <button
             type="button"
             disabled={!photoPath}
@@ -59,15 +64,6 @@ export function TransformPanel() {
             <IconRotateRight />
             <span>90</span>
           </button>
-          <button
-            type="button"
-            disabled={!photoPath}
-            onClick={() => rotateBy(180)}
-            className="rounded bg-ae-bg-panel px-2.5 py-1 text-xs text-ae-text-primary hover:bg-ae-border disabled:opacity-40"
-            title="Rotate 180 degrees"
-          >
-            180
-          </button>
           {transform.rotate !== 0 && (
             <button
               type="button"
@@ -79,11 +75,6 @@ export function TransformPanel() {
             </button>
           )}
         </div>
-        {transform.rotate !== 0 && (
-          <p className="mt-1 text-[10px] text-ae-text-secondary">
-            {Math.round(transform.rotate)} deg
-          </p>
-        )}
       </div>
       {SLIDERS.map(({ key, label }) => (
         <SliderControl

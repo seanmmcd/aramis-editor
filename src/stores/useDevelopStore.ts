@@ -17,6 +17,7 @@ import {
   maskEditsForPreview,
   type DisabledSections,
   type EditSectionId,
+  type HealSpot,
 } from "@/types/edits";
 import { notifyDevelopPersist } from "@/stores/editsEvents";
 import { useUIStore } from "@/stores/useUIStore";
@@ -61,6 +62,10 @@ interface DevelopState {
   setToneCurveParametric: (key: keyof ParametricCurve, value: number) => void;
   setHslChannel: (channel: keyof HslEdits, index: number, value: number) => void;
   setCalibration: (key: keyof CalibrationEdits, value: number) => void;
+  addHealSpot: (spot: Omit<HealSpot, "id"> & { id?: string }) => void;
+  updateHealSpot: (id: string, patch: Partial<HealSpot>) => void;
+  removeHealSpot: (id: string) => void;
+  clearHealSpots: () => void;
   setPreviewDataUrl: (url: string | null) => void;
   setPreviewDimensions: (dimensions: { width: number; height: number } | null) => void;
   setPreviewLoading: (loading: boolean) => void;
@@ -216,6 +221,61 @@ export const useDevelopStore = create<DevelopState>((set, get) => ({
     set((s) => ({
       edits: { ...s.edits, calibration: { ...s.edits.calibration, [key]: value } },
     })),
+  addHealSpot: (spot) => {
+    const id = spot.id ?? crypto.randomUUID();
+    const next: HealSpot = {
+      id,
+      dest_x: spot.dest_x,
+      dest_y: spot.dest_y,
+      source_x: spot.source_x,
+      source_y: spot.source_y,
+      radius: spot.radius,
+      mode: spot.mode,
+    };
+    set((s) => ({
+      edits: {
+        ...s.edits,
+        spot_heal: { spots: [...s.edits.spot_heal.spots, next] },
+      },
+    }));
+    useUIStore.getState().setSelectedHealSpotId(id);
+    schedulePreviewRefresh();
+  },
+  updateHealSpot: (id, patch) => {
+    set((s) => ({
+      edits: {
+        ...s.edits,
+        spot_heal: {
+          spots: s.edits.spot_heal.spots.map((spot) =>
+            spot.id === id ? { ...spot, ...patch } : spot,
+          ),
+        },
+      },
+    }));
+    schedulePreviewRefresh();
+  },
+  removeHealSpot: (id) => {
+    set((s) => ({
+      edits: {
+        ...s.edits,
+        spot_heal: {
+          spots: s.edits.spot_heal.spots.filter((spot) => spot.id !== id),
+        },
+      },
+    }));
+    const selected = useUIStore.getState().selectedHealSpotId;
+    if (selected === id) {
+      useUIStore.getState().setSelectedHealSpotId(null);
+    }
+    schedulePreviewRefresh();
+  },
+  clearHealSpots: () => {
+    set((s) => ({
+      edits: { ...s.edits, spot_heal: { spots: [] } },
+    }));
+    useUIStore.getState().setSelectedHealSpotId(null);
+    schedulePreviewRefresh();
+  },
   setPreviewDataUrl: (url) => set({ previewDataUrl: url }),
   setPreviewDimensions: (dimensions) => set({ previewDimensions: dimensions }),
   setPreviewLoading: (loading) => set({ isPreviewLoading: loading }),

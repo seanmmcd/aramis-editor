@@ -148,6 +148,23 @@ export interface DetailEdits {
   noise_reduction_color: number;
 }
 
+export type SpotHealMode = "heal" | "clone";
+
+export interface HealSpot {
+  id: string;
+  dest_x: number;
+  dest_y: number;
+  source_x: number;
+  source_y: number;
+  /** Radius as a fraction of min(image width, image height). */
+  radius: number;
+  mode: SpotHealMode;
+}
+
+export interface SpotHealEdits {
+  spots: HealSpot[];
+}
+
 export interface EditStack {
   lens: LensEdits;
   transform: TransformEdits;
@@ -159,6 +176,7 @@ export interface EditStack {
   calibration: CalibrationEdits;
   detail: DetailEdits;
   effects: EffectsEdits;
+  spot_heal: SpotHealEdits;
 }
 
 export type ExportFormat = "jpeg" | "tiff" | "png" | "original";
@@ -318,6 +336,9 @@ export const DEFAULT_EDIT_STACK: EditStack = {
     grain_size: 25,
     grain_roughness: 50,
   },
+  spot_heal: {
+    spots: [],
+  },
 };
 
 export type EditSectionId =
@@ -330,7 +351,8 @@ export type EditSectionId =
   | "transform"
   | "lens"
   | "detail"
-  | "effects";
+  | "effects"
+  | "spot_heal";
 
 export const EDIT_SECTION_IDS: EditSectionId[] = [
   "basic",
@@ -343,6 +365,7 @@ export const EDIT_SECTION_IDS: EditSectionId[] = [
   "lens",
   "detail",
   "effects",
+  "spot_heal",
 ];
 
 export type DisabledSections = Partial<Record<EditSectionId, boolean>>;
@@ -391,9 +414,15 @@ export function maskEditsForPreview(
   if (isDisabled("effects")) {
     masked.effects = structuredClone(DEFAULT_EDIT_STACK.effects);
   }
+  if (isDisabled("spot_heal")) {
+    masked.spot_heal = structuredClone(DEFAULT_EDIT_STACK.spot_heal);
+  }
 
   return masked;
 }
+
+export const DEFAULT_HEAL_SPOT_RADIUS = 0.018;
+export const DEFAULT_HEAL_SOURCE_OFFSET = 0.04;
 
 export const DEFAULT_EXPORT_SETTINGS: ExportSettings = {
   format: "jpeg",

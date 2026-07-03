@@ -56,6 +56,16 @@ export function TopBar() {
         ))}
       </nav>
       <div className="ml-auto flex items-center gap-2">
+        <Link
+          to="/settings"
+          className={`rounded px-3 py-1 text-xs ${
+            location.pathname.startsWith("/settings")
+              ? "bg-ae-accent text-white"
+              : "text-ae-muted hover:text-ae-text-primary"
+          }`}
+        >
+          Settings
+        </Link>
         <button
           type="button"
           disabled={photoId == null}

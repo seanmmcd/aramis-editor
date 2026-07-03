@@ -24,6 +24,7 @@ interface ExportState {
   lastOutputFolder: string | null;
   error: string | null;
   setSettings: (patch: Partial<ExportSettings>) => void;
+  applyDefaults: (defaults: ExportSettings) => void;
   addToWorkingSet: (photos: Photo[]) => void;
   removeFromWorkingSet: (id: number) => void;
   clearWorkingSet: () => void;
@@ -55,6 +56,14 @@ export const useExportStore = create<ExportState>((set, get) => ({
 
   setSettings: (patch) =>
     set((s) => ({ settings: { ...s.settings, ...patch }, error: null })),
+
+  applyDefaults: (defaults) =>
+    set((s) => ({
+      settings: {
+        ...defaults,
+        output_folder: s.settings.output_folder || defaults.output_folder,
+      },
+    })),
 
   addToWorkingSet: (photos) => {
     if (photos.length === 0) return;
@@ -102,19 +111,16 @@ export const useExportStore = create<ExportState>((set, get) => ({
 
   exportPhoto: async (photoId) => {
     const { settings } = get();
-    if (!settings.output_folder) {
-      set({ error: "Choose an output folder first." });
-      return null;
-    }
     set({ isExporting: true, error: null, progress: { current: 0, total: 1, currentFile: null } });
     try {
       const result = await invoke<ExportResult>("export_photo_cmd", {
         photoId,
         settings,
       });
+      const outputFolder = result.output_path.replace(/[\\/][^\\/]+$/, "");
       set({
         progress: { current: 1, total: 1, currentFile: result.output_path },
-        lastOutputFolder: settings.output_folder,
+        lastOutputFolder: outputFolder,
       });
       return result;
     } catch (error) {
@@ -127,12 +133,12 @@ export const useExportStore = create<ExportState>((set, get) => ({
 
   exportBatch: async () => {
     const { settings, selectedPhotoIds } = get();
-    if (!settings.output_folder) {
-      set({ error: "Choose an output folder first." });
-      return null;
-    }
     if (selectedPhotoIds.length === 0) {
       set({ error: "Select at least one photo to export." });
+      return null;
+    }
+    if (selectedPhotoIds.length > 1 && !settings.output_folder) {
+      set({ error: "Choose an output folder for multi-photo exports." });
       return null;
     }
 
@@ -150,13 +156,17 @@ export const useExportStore = create<ExportState>((set, get) => ({
       const lastSuccess = [...result.items]
         .reverse()
         .find((item) => item.result)?.result;
+      const outputFolder =
+        selectedPhotoIds.length === 1 && lastSuccess
+          ? lastSuccess.output_path.replace(/[\\/][^\\/]+$/, "")
+          : settings.output_folder;
       set({
         progress: {
           current: selectedPhotoIds.length,
           total: selectedPhotoIds.length,
           currentFile: lastSuccess?.output_path ?? null,
         },
-        lastOutputFolder: settings.output_folder,
+        lastOutputFolder: outputFolder || null,
       });
       if (result.failed > 0) {
         set({ error: `${result.failed} photo(s) failed to export.` });

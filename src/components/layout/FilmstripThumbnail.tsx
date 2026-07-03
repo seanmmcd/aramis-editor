@@ -1,4 +1,5 @@
 import { IconClose } from "@/components/icons";
+import { Spinner } from "@/components/Spinner";
 
 type Props = {
   src?: string;
@@ -24,8 +25,8 @@ export function FilmstripThumbnail({ src, alt, active, onSelect, onRemove, onCon
         {src ? (
           <img src={src} alt={alt} className="h-full w-full object-cover" />
         ) : (
-          <div className="flex h-full items-center justify-center bg-ae-bg text-[10px] text-ae-muted">
-            ...
+          <div className="flex h-full items-center justify-center bg-ae-bg">
+            <Spinner size={20} />
           </div>
         )}
       </button>

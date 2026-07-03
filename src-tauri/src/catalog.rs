@@ -8,6 +8,7 @@ const MAX_HISTORY: i64 = 100;
 pub struct FolderRow {
     pub id: i64,
     pub path: String,
+    pub parent_id: Option<i64>,
     pub added_at: String,
     pub photo_count: i64,
 }
@@ -78,7 +79,8 @@ impl Catalog {
         self.conn.execute_batch(
             r#"
             CREATE TABLE IF NOT EXISTS folders (
-              id INTEGER PRIMARY KEY, path TEXT UNIQUE NOT NULL, added_at TEXT NOT NULL
+              id INTEGER PRIMARY KEY, path TEXT UNIQUE NOT NULL, parent_id INTEGER,
+              added_at TEXT NOT NULL, FOREIGN KEY (parent_id) REFERENCES folders(id)
             );
             CREATE TABLE IF NOT EXISTS photos (
               id INTEGER PRIMARY KEY, folder_id INTEGER NOT NULL, file_path TEXT UNIQUE NOT NULL,
@@ -111,28 +113,64 @@ impl Catalog {
             CREATE INDEX IF NOT EXISTS idx_history_photo ON history(photo_id, id DESC);
             "#,
         )?;
+        let _ = self.conn.execute(
+            "ALTER TABLE folders ADD COLUMN parent_id INTEGER REFERENCES folders(id)",
+            [],
+        );
         Ok(())
     }
 
-    pub fn upsert_folder(&self, path: &str, added_at: &str) -> SqlResult<i64> {
+    pub fn upsert_folder(
+        &self,
+        path: &str,
+        parent_id: Option<i64>,
+        added_at: &str,
+    ) -> SqlResult<i64> {
         self.conn.execute(
-            "INSERT INTO folders (path, added_at) VALUES (?1,?2) ON CONFLICT(path) DO UPDATE SET path=excluded.path",
-            params![path, added_at],
+            "INSERT INTO folders (path, parent_id, added_at) VALUES (?1,?2,?3) ON CONFLICT(path) DO NOTHING",
+            params![path, parent_id, added_at],
         )?;
-        self.conn.query_row("SELECT id FROM folders WHERE path=?1", params![path], |r| r.get(0))
+        self.conn.query_row(
+            "SELECT id FROM folders WHERE path=?1",
+            params![path],
+            |r| r.get(0),
+        )
+    }
+
+    pub fn get_folder_id_by_path(&self, path: &str) -> SqlResult<Option<i64>> {
+        match self.conn.query_row(
+            "SELECT id FROM folders WHERE path=?1",
+            params![path],
+            |r| r.get(0),
+        ) {
+            Ok(id) => Ok(Some(id)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
+    pub fn list_child_folder_ids(&self, folder_id: i64) -> SqlResult<Vec<i64>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id FROM folders WHERE parent_id=?1")?;
+        let rows = stmt
+            .query_map(params![folder_id], |r| r.get(0))?
+            .collect();
+        rows
     }
 
     pub fn list_folders(&self) -> SqlResult<Vec<FolderRow>> {
         let mut stmt = self.conn.prepare(
-            "SELECT f.id,f.path,f.added_at,(SELECT COUNT(*) FROM photos p WHERE p.folder_id=f.id) FROM folders f ORDER BY f.added_at DESC",
+            "SELECT f.id,f.path,f.parent_id,f.added_at,(SELECT COUNT(*) FROM photos p WHERE p.folder_id=f.id) FROM folders f ORDER BY f.path COLLATE NOCASE",
         )?;
         let rows = stmt
             .query_map([], |r| {
                 Ok(FolderRow {
                     id: r.get(0)?,
                     path: r.get(1)?,
-                    added_at: r.get(2)?,
-                    photo_count: r.get(3)?,
+                    parent_id: r.get(2)?,
+                    added_at: r.get(3)?,
+                    photo_count: r.get(4)?,
                 })
             })?
             .collect();
@@ -140,6 +178,9 @@ impl Catalog {
     }
 
     pub fn remove_folder(&self, folder_id: i64) -> SqlResult<()> {
+        for child_id in self.list_child_folder_ids(folder_id)? {
+            self.remove_folder(child_id)?;
+        }
         for sql in [
             "DELETE FROM thumbnails WHERE photo_id IN (SELECT id FROM photos WHERE folder_id=?1)",
             "DELETE FROM history WHERE photo_id IN (SELECT id FROM photos WHERE folder_id=?1)",
@@ -181,6 +222,27 @@ impl Catalog {
 
     pub fn photo_exists(&self, file_path: &str) -> SqlResult<bool> {
         Ok(self.conn.query_row("SELECT COUNT(*) FROM photos WHERE file_path=?1", params![file_path], |r| r.get::<_, i64>(0))? > 0)
+    }
+
+    pub fn photos_missing_thumbnails(&self, photo_ids: &[i64]) -> SqlResult<Vec<(i64, String)>> {
+        if photo_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let placeholders = photo_ids
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(",");
+        let sql = format!(
+            "SELECT p.id,p.file_path FROM photos p LEFT JOIN thumbnails t ON t.photo_id=p.id WHERE p.id IN ({placeholders}) AND t.photo_id IS NULL"
+        );
+        let mut stmt = self.conn.prepare(&sql)?;
+        let rows = stmt
+            .query_map(rusqlite::params_from_iter(photo_ids.iter()), |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })?
+            .collect();
+        rows
     }
 
     pub fn insert_photo(&self, folder_id: i64, file_path: &str, file_name: &str, file_size: Option<i64>, width: Option<i32>, height: Option<i32>, capture_date: Option<&str>, camera_make: Option<&str>, camera_model: Option<&str>, imported_at: &str) -> SqlResult<i64> {

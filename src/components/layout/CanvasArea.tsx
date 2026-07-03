@@ -4,6 +4,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 
 import { ContextMenu, openContextMenu, type ContextMenuState } from "@/components/ContextMenu";
 import { CropOverlay } from "@/features/develop/CropOverlay";
+import { SpotHealOverlay } from "@/features/develop/SpotHealOverlay";
 import { revealFileInExplorer } from "@/lib/revealFile";
 
 import type { ImageBounds } from "@/features/develop/CropOverlay";
@@ -55,10 +56,19 @@ export function CanvasArea() {
   const allEditsEnabled = useDevelopStore((s) => s.allEditsEnabled);
   const toggleAllEdits = useDevelopStore((s) => s.toggleAllEdits);
   const cropMode = useUIStore((s) => s.cropMode);
+  const spotHealMode = useUIStore((s) => s.spotHealMode);
   const toggleCropMode = useUIStore((s) => s.toggleCropMode);
+  const toggleSpotHealMode = useUIStore((s) => s.toggleSpotHealMode);
   const setExportDialogOpen = useUIStore((s) => s.setExportDialogOpen);
+  const leftPanelVisible = useUIStore((s) => s.developLeftPanelVisible);
+  const rightPanelVisible = useUIStore((s) => s.developRightPanelVisible);
+  const filmstripVisible = useUIStore((s) => s.developFilmstripVisible);
+  const toggleLeftPanel = useUIStore((s) => s.toggleDevelopLeftPanel);
+  const toggleRightPanel = useUIStore((s) => s.toggleDevelopRightPanel);
+  const toggleFilmstrip = useUIStore((s) => s.toggleDevelopFilmstrip);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [imageNaturalSize, setImageNaturalSize] = useState({ width: 0, height: 0 });
@@ -156,6 +166,7 @@ export function CanvasArea() {
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent) => {
+      if (spotHealMode) return;
       const isMiddleButton = event.button === 1;
       const isSpacePan = spaceHeld && event.button === 0;
       if (!isMiddleButton && !isSpacePan) return;
@@ -165,7 +176,7 @@ export function CanvasArea() {
       setIsPanning(true);
       containerRef.current?.setPointerCapture(event.pointerId);
     },
-    [spaceHeld, pan.x, pan.y],
+    [spaceHeld, pan.x, pan.y, spotHealMode],
   );
 
   const handlePointerMove = useCallback(
@@ -217,6 +228,10 @@ export function CanvasArea() {
             onClick: toggleCropMode,
           },
           {
+            label: spotHealMode ? "Exit spot heal mode" : "Enter spot heal mode",
+            onClick: toggleSpotHealMode,
+          },
+          {
             label: "Quick Export",
             onClick: () => setExportDialogOpen(true),
             disabled: photoId == null,
@@ -229,14 +244,53 @@ export function CanvasArea() {
         setContextMenu,
       );
     },
-    [spaceHeld, photoPath, photoId, cropMode, fitToWindow, toggleCropMode, setExportDialogOpen],
+    [spaceHeld, photoPath, photoId, cropMode, spotHealMode, fitToWindow, toggleCropMode, toggleSpotHealMode, setExportDialogOpen],
   );
 
-  const panCursor = isPanning ? "grabbing" : spaceHeld ? "grab" : "default";
+  const panCursor = isPanning ? "grabbing" : spaceHeld ? "grab" : spotHealMode ? "crosshair" : "default";
 
   return (
     <main className="flex min-w-0 flex-1 flex-col bg-ae-bg-primary">
-      <div className="flex items-center justify-end gap-2 border-b border-ae-border px-4 py-2">
+      <div className="flex items-center justify-between gap-2 border-b border-ae-border px-4 py-2">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={toggleLeftPanel}
+            className={`rounded px-2.5 py-1 text-xs ${
+              leftPanelVisible
+                ? "bg-ae-accent text-white"
+                : "bg-ae-bg-panel text-ae-text-primary hover:bg-ae-border"
+            }`}
+            title="Toggle left panel"
+          >
+            Left
+          </button>
+          <button
+            type="button"
+            onClick={toggleRightPanel}
+            className={`rounded px-2.5 py-1 text-xs ${
+              rightPanelVisible
+                ? "bg-ae-accent text-white"
+                : "bg-ae-bg-panel text-ae-text-primary hover:bg-ae-border"
+            }`}
+            title="Toggle right panel"
+          >
+            Right
+          </button>
+          <button
+            type="button"
+            onClick={toggleFilmstrip}
+            className={`rounded px-2.5 py-1 text-xs ${
+              filmstripVisible
+                ? "bg-ae-accent text-white"
+                : "bg-ae-bg-panel text-ae-text-primary hover:bg-ae-border"
+            }`}
+            title="Toggle filmstrip"
+          >
+            Filmstrip
+          </button>
+        </div>
+        <div className="flex items-center gap-2">
         <EditToggleEye
           enabled={allEditsEnabled}
           onClick={toggleAllEdits}
@@ -258,11 +312,22 @@ export function CanvasArea() {
         </button>
         <button
           type="button"
+          onClick={toggleSpotHealMode}
+          disabled={spotHealMode}
+          className={`rounded px-3 py-1 text-xs ${
+            spotHealMode ? "bg-ae-accent text-white" : "bg-ae-bg-panel text-ae-text-primary hover:bg-ae-border"
+          } disabled:cursor-default disabled:opacity-100`}
+        >
+          Spot Heal
+        </button>
+        <button
+          type="button"
           onClick={handleOpenPhoto}
           className="rounded bg-ae-bg-panel px-3 py-1 text-xs text-ae-text-primary hover:bg-ae-border"
         >
           Open Photo
         </button>
+        </div>
       </div>
       <div
         ref={containerRef}
@@ -291,6 +356,7 @@ export function CanvasArea() {
             }}
           >
             <img
+              ref={imageRef}
               src={previewDataUrl}
               alt="Develop preview"
               className="absolute shadow-lg"
@@ -312,6 +378,9 @@ export function CanvasArea() {
               onContextMenu={handlePreviewContextMenu}
             />
             {cropMode && <CropOverlay bounds={imageBounds} />}
+            {spotHealMode && !cropMode && (
+              <SpotHealOverlay bounds={imageBounds} imageRef={imageRef} />
+            )}
           </div>
         )}
         {isPreviewLoading && previewDataUrl && (

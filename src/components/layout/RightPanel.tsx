@@ -7,6 +7,7 @@ import { EffectsPanel } from "@/features/develop/EffectsPanel";
 import { HslPanel } from "@/features/develop/HslPanel";
 import { LensPanel } from "@/features/develop/LensPanel";
 import { ToneCurvePanel } from "@/features/develop/ToneCurvePanel";
+import { SpotHealPanel } from "@/features/develop/SpotHealPanel";
 import { TransformPanel } from "@/features/develop/TransformPanel";
 import { schedulePreviewRefresh, useDevelopStore } from "@/stores/useDevelopStore";
 import { useUIStore } from "@/stores/useUIStore";
@@ -178,6 +179,10 @@ export function RightPanel() {
 
         <CollapsibleSection sectionId="right-effects" title="Effects" editSectionId="effects">
           <EffectsPanel />
+        </CollapsibleSection>
+
+        <CollapsibleSection sectionId="right-spot-heal" title="Spot Heal" editSectionId="spot_heal">
+          <SpotHealPanel />
         </CollapsibleSection>
       </div>
     </aside>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ContextMenu, openContextMenu, type ContextMenuState } from "@/components/ContextMenu";
+import { Spinner } from "@/components/Spinner";
 import { revealFileInExplorer } from "@/lib/revealFile";
 import { useLibraryStore } from "@/stores/useLibraryStore";
 import { useDevelopStore } from "@/stores/useDevelopStore";
@@ -8,6 +9,7 @@ import { syncLibrarySelectionToExportQueue } from "@/stores/useExportStore";
 import { useUIStore } from "@/stores/useUIStore";
 import { useFilmstripSelection } from "./useFilmstripSelection";
 import { thumbnailSrc } from "./thumbnailSrc";
+import { useLazyThumbnails } from "./useLazyThumbnails";
 import type { Photo } from "./types";
 
 export function PhotoGrid() {
@@ -21,6 +23,7 @@ export function PhotoGrid() {
     searchPhotos,
     removePhoto,
     photosLoading,
+    isImporting,
     refreshFolderThumbnails,
     thumbnailCacheBust,
   } = useLibraryStore();
@@ -34,15 +37,19 @@ export function PhotoGrid() {
   const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);
 
   const isSearchMode = searchQuery.trim().length > 0;
   const displayPhotos = isSearchMode ? (searchResults ?? []) : photos;
-  const missingThumbCount = useMemo(
-    () => displayPhotos.filter((p) => !p.thumbnail_path).length,
+  const missingThumbIds = useMemo(
+    () => displayPhotos.filter((p) => !p.thumbnail_path).map((p) => p.id),
     [displayPhotos],
   );
-  const thumbRefreshPollingRef = useRef(thumbRefreshPolling);
-  thumbRefreshPollingRef.current = thumbRefreshPolling;
+  const requestThumbnail = useLazyThumbnails(
+    missingThumbIds,
+    !isSearchMode && selectedFolderId != null,
+    selectedFolderId,
+  );
 
   const handleRefreshThumbnails = async () => {
     if (selectedFolderId == null || isSearchMode) return;
@@ -62,46 +69,23 @@ export function PhotoGrid() {
   }, [selectedFolderId, refreshPhotos, isSearchMode]);
 
   useEffect(() => {
-    if (displayPhotos.length === 0) return;
-    if (missingThumbCount === 0 && !thumbRefreshPolling) return;
+    if (!thumbRefreshPolling || isSearchMode || selectedFolderId == null) return;
 
-    let stagnantPolls = 0;
-    let lastMissing = missingThumbCount;
-
+    let polls = 0;
     const interval = setInterval(() => {
+      polls += 1;
       const state = useLibraryStore.getState();
-      const currentPhotos = isSearchMode ? (state.searchResults ?? []) : state.photos;
-      const currentMissing = currentPhotos.filter((p) => !p.thumbnail_path).length;
-
-      if (!thumbRefreshPollingRef.current) {
-        if (currentMissing === lastMissing) {
-          stagnantPolls += 1;
-        } else {
-          stagnantPolls = 0;
-          lastMissing = currentMissing;
-        }
-        if (currentMissing === 0 || stagnantPolls >= 20) {
-          clearInterval(interval);
-          return;
-        }
+      const currentMissing = state.photos.filter((p) => !p.thumbnail_path).length;
+      if (currentMissing === 0 || polls >= 20) {
+        clearInterval(interval);
+        setThumbRefreshPolling(false);
+        return;
       }
-
-      if (isSearchMode) {
-        void state.searchPhotos(searchQuery, { silent: true });
-      } else if (selectedFolderId != null) {
-        void state.refreshPhotos(selectedFolderId, { silent: true });
-      }
+      void state.refreshPhotos(selectedFolderId, { silent: true });
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [
-    missingThumbCount,
-    thumbRefreshPolling,
-    displayPhotos.length,
-    isSearchMode,
-    searchQuery,
-    selectedFolderId,
-  ]);
+  }, [thumbRefreshPolling, isSearchMode, selectedFolderId]);
 
   useEffect(() => {
     if (!thumbRefreshPolling) return;
@@ -236,7 +220,12 @@ export function PhotoGrid() {
         refreshingThumbnails={refreshingThumbs}
       />
 
-      {photosLoading && <p className="px-4 pt-2 text-sm text-ae-muted">Loading photos...</p>}
+      {(isImporting || photosLoading) && (
+        <div className="flex items-center gap-2 px-4 pt-2 text-sm text-ae-muted">
+          <Spinner size={16} />
+          <span>{isImporting ? "Importing photos…" : "Loading photos…"}</span>
+        </div>
+      )}
       {showNoResults && (
         <div className="flex flex-1 items-center justify-center text-ae-muted">
           No photos match &ldquo;{searchQuery.trim()}&rdquo;
@@ -244,7 +233,7 @@ export function PhotoGrid() {
       )}
 
       {!showNoResults && (
-        <div className="min-h-0 flex-1 overflow-auto p-4">
+        <div ref={setScrollRoot} className="min-h-0 flex-1 overflow-auto p-4">
           <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
             {displayPhotos.map((photo) => (
               <PhotoGridItem
@@ -252,6 +241,8 @@ export function PhotoGrid() {
                 photo={photo}
                 selected={selectedPhotoIds.includes(photo.id)}
                 cacheBust={thumbnailCacheBust}
+                scrollRoot={scrollRoot}
+                onNeedThumbnail={requestThumbnail}
                 onToggle={() => togglePhoto(photo.id)}
                 onOpen={() => void openInDevelop(photo.id, photo.file_path)}
                 onContextMenu={(e) => onContextMenu(e, photo)}
@@ -302,6 +293,8 @@ const PhotoGridItem = memo(function PhotoGridItem({
   photo,
   selected,
   cacheBust,
+  scrollRoot,
+  onNeedThumbnail,
   onToggle,
   onOpen,
   onContextMenu,
@@ -309,14 +302,38 @@ const PhotoGridItem = memo(function PhotoGridItem({
   photo: Photo;
   selected: boolean;
   cacheBust: number;
+  scrollRoot: HTMLDivElement | null;
+  onNeedThumbnail: (photoId: number) => void;
   onToggle: () => void;
   onOpen: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
 }) {
+  const itemRef = useRef<HTMLButtonElement>(null);
   const src = thumbnailSrc(photo.thumbnail_path, cacheBust);
+
+  useEffect(() => {
+    if (photo.thumbnail_path || !itemRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          onNeedThumbnail(photo.id);
+        }
+      },
+      {
+        root: scrollRoot,
+        rootMargin: "240px",
+        threshold: 0.01,
+      },
+    );
+
+    observer.observe(itemRef.current);
+    return () => observer.disconnect();
+  }, [photo.id, photo.thumbnail_path, scrollRoot, onNeedThumbnail]);
 
   return (
     <button
+      ref={itemRef}
       type="button"
       onClick={onToggle}
       onDoubleClick={onOpen}
@@ -334,8 +351,8 @@ const PhotoGridItem = memo(function PhotoGridItem({
             loading="lazy"
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-xs text-ae-muted">
-            No preview
+          <div className="flex h-full items-center justify-center bg-ae-bg">
+            <Spinner size={24} />
           </div>
         )}
       </div>

@@ -29,6 +29,7 @@ interface LibraryState {
   selectedFolderId: number | null;
   foldersLoading: boolean;
   photosLoading: boolean;
+  isImporting: boolean;
   error: string | null;
   refreshFolders: () => Promise<void>;
   refreshPhotos: (folderId: number | null, options?: { silent?: boolean }) => Promise<void>;
@@ -51,6 +52,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   selectedFolderId: null,
   foldersLoading: false,
   photosLoading: false,
+  isImporting: false,
   error: null,
 
   refreshFolders: async () => {
@@ -133,7 +135,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   clearSearch: () => set({ searchQuery: "", searchResults: null }),
 
   importFolder: async (path) => {
-    set({ foldersLoading: true, error: null });
+    set({ isImporting: true, error: null });
     try {
       const result = await invoke<ImportResult>("import_folder", { path });
       await get().refreshFolders();
@@ -142,7 +144,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     } catch (error) {
       set({ error: String(error) });
     } finally {
-      set({ foldersLoading: false });
+      set({ isImporting: false });
     }
   },
 

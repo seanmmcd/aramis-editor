@@ -9,6 +9,7 @@ mod metadata;
 mod presets;
 mod preview_worker;
 mod raw;
+mod settings;
 mod snapshots;
 mod upscale;
 mod xmp;
@@ -20,16 +21,19 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use catalog::{Catalog, FolderRow, PhotoRow};
 use editor::{Editor, EditorError};
 use edits::EditStack;
-use export::{export_batch, export_photo, BatchExportResult, ExportResult, ExportSettings};
+use export::{export_batch_prepared, export_photo, BatchExportResult, ExportResult, ExportSettings};
 use history::HistoryEntry;
 use library::{ImportResult, Library, LibraryError};
 use presets::Preset;
 use preview_worker::{PreviewCache, PreviewResponse, PreviewWorker};
+use settings::AppSettings;
 use snapshots::Snapshot;
 use tauri::Manager;
 
 struct AppState {
     library: std::sync::Mutex<Library>,
+    settings: std::sync::Mutex<AppSettings>,
+    settings_path: std::path::PathBuf,
     preview_cache: Arc<PreviewCache>,
     preview_worker: PreviewWorker,
 }
@@ -95,6 +99,11 @@ fn search_photos(state: tauri::State<'_, AppState>, query: String) -> Result<Vec
 #[tauri::command]
 fn refresh_folder_thumbnails(state: tauri::State<'_, AppState>, folder_id: i64) -> Result<u32, String> {
     state.with_library(|lib| lib.refresh_folder_thumbnails(folder_id))
+}
+
+#[tauri::command]
+fn generate_thumbnails(state: tauri::State<'_, AppState>, photo_ids: Vec<i64>) -> Result<u32, String> {
+    state.with_library(|lib| lib.generate_thumbnails(photo_ids))
 }
 
 #[tauri::command]
@@ -239,27 +248,78 @@ fn apply_edits(
 }
 
 #[tauri::command]
-fn export_photo_cmd(
+fn get_app_settings(state: tauri::State<'_, AppState>) -> Result<AppSettings, String> {
+    state
+        .settings
+        .lock()
+        .map(|s| s.clone())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn save_app_settings(
+    state: tauri::State<'_, AppState>,
+    settings: AppSettings,
+) -> Result<AppSettings, String> {
+    let mut guard = state.settings.lock().map_err(|e| e.to_string())?;
+    *guard = settings;
+    guard.save(&state.settings_path)?;
+    Ok(guard.clone())
+}
+
+#[tauri::command]
+async fn export_photo_cmd(
     state: tauri::State<'_, AppState>,
     photo_id: i64,
     settings: ExportSettings,
 ) -> Result<ExportResult, String> {
-    let library = state.library.lock().map_err(|e| e.to_string())?;
-    let editor = Editor::new(library.catalog());
-    let path = editor.get_photo_path(photo_id).map_err(|e| e.to_string())?;
-    let edits = editor.get_edits(photo_id).map_err(|e| e.to_string())?;
-    export_photo(Path::new(&path), &edits, &settings)
+    let (path, edits) = {
+        let library = state.library.lock().map_err(|e| e.to_string())?;
+        let editor = Editor::new(library.catalog());
+        let path = editor.get_photo_path(photo_id).map_err(|e| e.to_string())?;
+        let edits = editor.get_edits(photo_id).map_err(|e| e.to_string())?;
+        (path, edits)
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        export_photo(Path::new(&path), &edits, &settings)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn export_batch_cmd(
+async fn export_batch_cmd(
     state: tauri::State<'_, AppState>,
     photo_ids: Vec<i64>,
     settings: ExportSettings,
 ) -> Result<BatchExportResult, String> {
-    let library = state.library.lock().map_err(|e| e.to_string())?;
-    let editor = Editor::new(library.catalog());
-    Ok(export_batch(&editor, &photo_ids, &settings))
+    let thread_count = state
+        .settings
+        .lock()
+        .map_err(|e| e.to_string())?
+        .effective_export_threads();
+    let prepared = {
+        let library = state.library.lock().map_err(|e| e.to_string())?;
+        let editor = Editor::new(library.catalog());
+        let mut work: Vec<(i64, Result<(String, EditStack), String>)> =
+            Vec::with_capacity(photo_ids.len());
+        for &photo_id in &photo_ids {
+            let item = match editor.get_photo_path(photo_id) {
+                Ok(path) => match editor.get_edits(photo_id) {
+                    Ok(edits) => Ok((path, edits)),
+                    Err(e) => Err(e.to_string()),
+                },
+                Err(e) => Err(e.to_string()),
+            };
+            work.push((photo_id, item));
+        }
+        work
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        export_batch_prepared(&prepared, &settings, thread_count)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -280,6 +340,8 @@ pub fn run() {
         .setup(|app| {
             let app_data = app.path().app_data_dir().expect("app data");
             std::fs::create_dir_all(&app_data).ok();
+            let settings_path = app_data.join("settings.json");
+            let settings = AppSettings::load(&settings_path);
             let catalog_path = app_data.join("catalog.db");
             let catalog = Catalog::open(&catalog_path).expect("catalog");
             let library =
@@ -288,6 +350,8 @@ pub fn run() {
             let preview_worker = PreviewWorker::spawn(Arc::clone(&preview_cache));
             app.manage(AppState {
                 library: std::sync::Mutex::new(library),
+                settings: std::sync::Mutex::new(settings),
+                settings_path,
                 preview_cache,
                 preview_worker,
             });
@@ -295,9 +359,11 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_app_version,
+            get_app_settings,
+            save_app_settings,
             list_supported_raw_formats,
             import_folder, list_photos, get_folders, remove_folder, remove_photo, search_photos,
-            refresh_folder_thumbnails,
+            refresh_folder_thumbnails, generate_thumbnails,
             get_photo_edits, get_edits_for_path, get_photo_id_by_path, save_edits, save_edits_for_path,
             create_preset, list_presets, delete_preset, apply_preset,
             list_history, restore_history,
