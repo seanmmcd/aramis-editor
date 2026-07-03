@@ -48,7 +48,7 @@ export function SpotHealOverlay({ bounds, imageRef, zoom }: SpotHealOverlayProps
     startNorm: { x: number; y: number };
     startSpot: HealSpot;
   } | null>(null);
-  const [dragging, setDragging] = useState(false);
+  const [activeDrag, setActiveDrag] = useState<{ spotId: string; kind: DragKind } | null>(null);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -80,14 +80,14 @@ export function SpotHealOverlay({ bounds, imageRef, zoom }: SpotHealOverlayProps
         startNorm,
         startSpot: { ...spot },
       };
-      setDragging(true);
+      setActiveDrag({ spotId: spot.id, kind });
       (event.target as HTMLElement).setPointerCapture(event.pointerId);
     },
     [setSelectedHealSpotId, imageRef],
   );
 
   useEffect(() => {
-    if (!dragging) return;
+    if (!activeDrag) return;
 
     const onMove = (event: PointerEvent) => {
       const drag = dragRef.current;
@@ -127,17 +127,19 @@ export function SpotHealOverlay({ bounds, imageRef, zoom }: SpotHealOverlayProps
 
     const onUp = () => {
       dragRef.current = null;
-      setDragging(false);
+      setActiveDrag(null);
       schedulePreviewRefresh({ final: true });
     };
 
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
     return () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
     };
-  }, [dragging, bounds.width, bounds.height, imageRef, updateHealSpot]);
+  }, [activeDrag, bounds.width, bounds.height, imageRef, updateHealSpot]);
 
   const handleCanvasPointerDown = (event: React.PointerEvent) => {
     if (event.button !== 0) return;
@@ -166,13 +168,14 @@ export function SpotHealOverlay({ bounds, imageRef, zoom }: SpotHealOverlayProps
     });
   };
 
-  const uiScale = 1 / Math.max(zoom, 0.25);
-  const strokeWidth = Math.max(0.5, uiScale);
-  const selectedStrokeWidth = Math.max(0.75, 1.25 * uiScale);
-  const handleSize = Math.max(6, 10 * uiScale);
+  const uiScale = 1 / Math.max(zoom, 1);
+  const strokeWidth = Math.max(0.2, 0.65 * uiScale);
+  const selectedStrokeWidth = Math.max(0.3, 0.85 * uiScale);
+  const handleSize = Math.max(4, 7 * uiScale);
   const half = handleSize / 2;
-  const dashLength = Math.max(2, 4 * uiScale);
-  const gapLength = Math.max(2, 3 * uiScale);
+  const dashLength = Math.max(1.5, 3 * uiScale);
+  const gapLength = Math.max(1.5, 2.5 * uiScale);
+  const handleBorder = Math.max(0.5, 1.25 * uiScale);
 
   return (
     <div className="pointer-events-none absolute inset-0">
@@ -195,69 +198,83 @@ export function SpotHealOverlay({ bounds, imageRef, zoom }: SpotHealOverlayProps
         const sourceY = bounds.y + spot.source_y * bounds.height;
         const radiusPx = spotPixelRadius(spot, bounds);
 
+        const isDragging = activeDrag?.spotId === spot.id;
+        const dragKind = isDragging ? activeDrag.kind : null;
+        const hideOverlay = isDragging;
+        const hideDest = dragKind === "dest" || dragKind === "radius";
+        const hideSource = dragKind === "source";
+
         return (
           <div key={spot.id}>
-            <svg className="pointer-events-none absolute inset-0 overflow-visible" width="100%" height="100%">
-              <line
-                x1={destX}
-                y1={destY}
-                x2={sourceX}
-                y2={sourceY}
-                stroke={selected ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.45)"}
-                strokeWidth={strokeWidth}
-                strokeDasharray={`${dashLength} ${gapLength}`}
+            {!hideOverlay && (
+              <svg className="pointer-events-none absolute inset-0 overflow-visible" width="100%" height="100%">
+                <line
+                  x1={destX}
+                  y1={destY}
+                  x2={sourceX}
+                  y2={sourceY}
+                  stroke={selected ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.4)"}
+                  strokeWidth={strokeWidth}
+                  strokeDasharray={`${dashLength} ${gapLength}`}
+                />
+                <circle
+                  cx={destX}
+                  cy={destY}
+                  r={radiusPx}
+                  fill="none"
+                  stroke={selected ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.5)"}
+                  strokeWidth={selected ? selectedStrokeWidth : strokeWidth}
+                />
+              </svg>
+            )}
+            {!hideSource && (
+              <div
+                className="pointer-events-auto absolute rounded-full bg-ae-accent"
+                style={{
+                  left: sourceX - half,
+                  top: sourceY - half,
+                  width: handleSize,
+                  height: handleSize,
+                  borderWidth: handleBorder,
+                  borderStyle: "solid",
+                  borderColor: "white",
+                  cursor: "move",
+                }}
+                onPointerDown={startDrag("source", spot)}
               />
-              <circle
-                cx={destX}
-                cy={destY}
-                r={radiusPx}
-                fill="none"
-                stroke={selected ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.55)"}
-                strokeWidth={selected ? selectedStrokeWidth : strokeWidth}
+            )}
+            {!hideDest && (
+              <div
+                className={`pointer-events-auto absolute rounded-full ${
+                  selected ? "bg-white" : "bg-ae-bg-panel"
+                }`}
+                style={{
+                  left: destX - half,
+                  top: destY - half,
+                  width: handleSize,
+                  height: handleSize,
+                  borderWidth: handleBorder,
+                  borderStyle: "solid",
+                  borderColor: selected ? "var(--color-ae-accent, #3b82f6)" : "white",
+                  cursor: "move",
+                }}
+                onPointerDown={startDrag("dest", spot)}
               />
-            </svg>
-            <div
-              className="pointer-events-auto absolute rounded-full bg-ae-accent"
-              style={{
-                left: sourceX - half,
-                top: sourceY - half,
-                width: handleSize,
-                height: handleSize,
-                borderWidth: Math.max(1, 2 * uiScale),
-                borderStyle: "solid",
-                borderColor: "white",
-                cursor: "move",
-              }}
-              onPointerDown={startDrag("source", spot)}
-            />
-            <div
-              className={`pointer-events-auto absolute rounded-full ${
-                selected ? "border-ae-accent bg-white" : "border-white bg-ae-bg-panel"
-              }`}
-              style={{
-                left: destX - half,
-                top: destY - half,
-                width: handleSize,
-                height: handleSize,
-                borderWidth: Math.max(1, 2 * uiScale),
-                borderStyle: "solid",
-                borderColor: selected ? "var(--color-ae-accent, #3b82f6)" : "white",
-                cursor: "move",
-              }}
-              onPointerDown={startDrag("dest", spot)}
-            />
-            <div
-              className="pointer-events-auto absolute rounded-sm border border-white bg-ae-accent"
-              style={{
-                left: destX + radiusPx - half,
-                top: destY - half,
-                width: handleSize,
-                height: handleSize,
-                borderWidth: Math.max(0.5, uiScale),
-                cursor: "ew-resize",
-              }}
-              onPointerDown={startDrag("radius", spot)}
-            />
+            )}
+            {!hideOverlay && (
+              <div
+                className="pointer-events-auto absolute rounded-sm border border-white bg-ae-accent"
+                style={{
+                  left: destX + radiusPx - half,
+                  top: destY - half,
+                  width: handleSize,
+                  height: handleSize,
+                  borderWidth: Math.max(0.35, 0.75 * uiScale),
+                  cursor: "ew-resize",
+                }}
+                onPointerDown={startDrag("radius", spot)}
+              />
+            )}
           </div>
         );
       })}

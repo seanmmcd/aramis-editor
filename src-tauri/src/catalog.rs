@@ -371,6 +371,10 @@ impl Catalog {
         let e = self.get_history_entry(history_id)?;
         if e.photo_id != photo_id { return Err(rusqlite::Error::QueryReturnedNoRows); }
         self.set_photo_edits(photo_id, &e.edits)?;
+        self.conn().execute(
+            "DELETE FROM history WHERE photo_id=?1 AND id > ?2",
+            params![photo_id, history_id],
+        )?;
         Ok(e.edits)
     }
 
@@ -378,6 +382,8 @@ impl Catalog {
         let path = self.get_photo_path(photo_id)?;
         let edits = crate::metadata::original_edits_for_path(std::path::Path::new(&path));
         self.set_photo_edits(photo_id, &edits)?;
+        self.conn()
+            .execute("DELETE FROM history WHERE photo_id=?1", params![photo_id])?;
         Ok(edits)
     }
 

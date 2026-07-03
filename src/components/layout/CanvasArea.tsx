@@ -16,7 +16,7 @@ import { useDevelopStore } from "@/stores/useDevelopStore";
 import { useUIStore } from "@/stores/useUIStore";
 
 const MIN_ZOOM = 1;
-const MAX_ZOOM = 12;
+const MAX_ZOOM = 32;
 const ZOOM_WHEEL_FACTOR = 0.0012;
 
 function computeObjectContainBounds(

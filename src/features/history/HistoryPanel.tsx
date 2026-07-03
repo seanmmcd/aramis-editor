@@ -46,6 +46,7 @@ export function HistoryPanel() {
     try {
       const next = await invoke<EditStack>("restore_history", { photoId, historyId });
       applyRestoredEdits(next);
+      await load();
     } catch (e) {
       console.error(e);
     }
@@ -56,6 +57,7 @@ export function HistoryPanel() {
     try {
       const next = await invoke<EditStack>("restore_original", { photoId });
       applyRestoredEdits(next);
+      await load();
     } catch (e) {
       console.error(e);
     }
@@ -72,7 +74,7 @@ export function HistoryPanel() {
   return (
     <div className="max-h-56 overflow-y-auto px-2 py-1 text-xs">
       <p className="mb-1 px-1 text-ae-text-secondary">
-        Auto-saved steps. Revert restores a step without adding history.
+        Auto-saved steps. Revert trims newer history from that point.
       </p>
       {entries.length === 0 ? (
         <p className="px-1 py-2 text-ae-text-secondary">No history yet.</p>
