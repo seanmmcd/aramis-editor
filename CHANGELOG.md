@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.1.6 (2026-07-03)
+
+- Add GitHub Pages landing site at aramis.smcd.pw. (e0b8bfc)
 ## v0.1.5 (2026-07-03)
 
 - Revert history improvements (2c62c77)
