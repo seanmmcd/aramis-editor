@@ -1,20 +1,19 @@
 :root {
-  --bg: #eef1f6;
-  --surface: #ffffff;
-  --surface-muted: #f7f8fa;
-  --border: #dde2ea;
-  --border-strong: #c8d0dc;
-  --text: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
-  --accent: #1d4ed8;
-  --accent-hover: #1e40af;
-  --accent-soft: #eff6ff;
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
-  --shadow-md: 0 8px 32px rgba(15, 23, 42, 0.1);
-  --shadow-lg: 0 24px 64px rgba(15, 23, 42, 0.14);
+  --bg: #1a1a1a;
+  --surface: #242424;
+  --surface-muted: #2d2d2d;
+  --border: #4a4a4a;
+  --border-strong: #5c5c5c;
+  --text: #e8e8e8;
+  --text-secondary: #9a9a9a;
+  --text-muted: #6b6b6b;
+  --accent: #2d8ceb;
+  --accent-hover: #4a9ef0;
+  --accent-soft: rgba(45, 140, 235, 0.14);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 20px 56px rgba(0, 0, 0, 0.45);
   --radius: 10px;
-  --radius-lg: 16px;
+  --radius-lg: 14px;
   --font: "Inter", system-ui, -apple-system, sans-serif;
   --topbar-h: 3.5rem;
   --footbar-h: 2.25rem;
@@ -39,8 +38,8 @@ body {
   line-height: 1.5;
   color: var(--text);
   background:
-    radial-gradient(circle at 0% 0%, rgba(29, 78, 216, 0.06), transparent 40%),
-    radial-gradient(circle at 100% 100%, rgba(148, 163, 184, 0.12), transparent 45%),
+    radial-gradient(circle at 0% 0%, rgba(45, 140, 235, 0.08), transparent 42%),
+    radial-gradient(circle at 100% 100%, rgba(45, 140, 235, 0.04), transparent 40%),
     var(--bg);
   -webkit-font-smoothing: antialiased;
 }
@@ -74,7 +73,7 @@ button {
   align-items: center;
   gap: 1.5rem;
   padding: 0 1.25rem;
-  background: rgba(255, 255, 255, 0.88);
+  background: rgba(30, 30, 30, 0.92);
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(12px);
 }
@@ -89,15 +88,14 @@ button {
 .topbar__logo {
   width: 1.5rem;
   height: 1.5rem;
-  border-radius: 0.35rem;
-  background: linear-gradient(145deg, #2563eb, #1e3a8a);
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+  border-radius: 0.3rem;
 }
 
 .topbar__name {
   font-weight: 700;
   font-size: 0.95rem;
   letter-spacing: -0.02em;
+  color: var(--text);
 }
 
 .module-tabs {
@@ -118,7 +116,7 @@ button {
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: background 0.18s, border-color 0.18s, color 0.18s, transform 0.12s, box-shadow 0.18s;
+  transition: background 0.18s, border-color 0.18s, color 0.18s, transform 0.12s;
 }
 
 .module-tab:hover {
@@ -195,12 +193,12 @@ button {
 .btn--primary {
   background: var(--accent);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(29, 78, 216, 0.3);
+  box-shadow: 0 2px 10px rgba(45, 140, 235, 0.35);
 }
 
 .btn--primary:hover {
   background: var(--accent-hover);
-  box-shadow: 0 4px 14px rgba(29, 78, 216, 0.35);
+  box-shadow: 0 4px 16px rgba(45, 140, 235, 0.4);
 }
 
 .btn--secondary {
@@ -321,57 +319,15 @@ button {
   border: 1px solid var(--border);
 }
 
-/* Preview */
+/* Preview — bare screenshots, no frame */
 
 .preview {
-  display: flex;
-  flex-direction: column;
+  position: relative;
   min-height: 0;
   min-width: 0;
   border-radius: var(--radius-lg);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-lg);
   overflow: hidden;
-}
-
-.preview__chrome {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.55rem 0.85rem;
-  background: var(--surface-muted);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-
-.preview__dots {
-  display: flex;
-  gap: 0.35rem;
-}
-
-.preview__dots span {
-  width: 0.55rem;
-  height: 0.55rem;
-  border-radius: 50%;
-  background: var(--border-strong);
-}
-
-.preview__dots span:first-child { background: #fca5a5; }
-.preview__dots span:nth-child(2) { background: #fde047; }
-.preview__dots span:nth-child(3) { background: #86efac; }
-
-.preview__caption {
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--text-muted);
-}
-
-.preview__viewport {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  background: #1a1d24;
+  box-shadow: var(--shadow-lg);
 }
 
 .preview__screen {
@@ -379,7 +335,7 @@ button {
   inset: 0;
   margin: 0;
   opacity: 0;
-  transform: scale(0.985);
+  transform: scale(0.99);
   transition: opacity 0.35s ease, transform 0.35s ease;
   pointer-events: none;
 }
@@ -407,7 +363,7 @@ button {
   font-size: 0.6875rem;
   color: var(--text-muted);
   border-top: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(30, 30, 30, 0.92);
 }
 
 .footbar__links {
@@ -424,7 +380,7 @@ button {
   color: var(--accent);
 }
 
-/* Responsive — allow scroll only on small screens */
+/* Responsive */
 
 @media (max-width: 900px) {
   html,

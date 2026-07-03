@@ -7,7 +7,6 @@ const MODULES = {
       "Thumbnail grid with search",
       "Multi-select & filmstrip",
     ],
-    caption: "Library",
   },
   develop: {
     title: "Develop with precision,<br>non-destructively.",
@@ -17,7 +16,6 @@ const MODULES = {
       "Tone curve, HSL & calibration",
       "Presets, history & spot heal",
     ],
-    caption: "Develop",
   },
   export: {
     title: "Export in batch,<br>your way.",
@@ -27,7 +25,6 @@ const MODULES = {
       "JPEG, PNG & TIFF output",
       "Quality, resize & upscale",
     ],
-    caption: "Export",
   },
 };
 
@@ -40,7 +37,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const titleEl = document.querySelector("[data-pitch-title]");
   const bodyEl = document.querySelector("[data-pitch-body]");
   const featuresEl = document.querySelector("[data-pitch-features]");
-  const captionEl = document.querySelector("[data-preview-caption]");
 
   let active = "library";
 
@@ -67,7 +63,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const mod = MODULES[name];
       titleEl.innerHTML = mod.title;
       bodyEl.textContent = mod.body;
-      captionEl.textContent = mod.caption;
 
       featuresEl.innerHTML = mod.features
         .map((item) => `<li>${item}</li>`)

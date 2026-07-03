@@ -7,9 +7,7 @@ baseurl: ""
 lang: en
 
 github_repo: seanmmcd/aramis-editor
-latest_release: v0.1.5
-download_url: https://github.com/seanmmcd/aramis-editor/releases/download/v0.1.5/Aramis.Editor_0.1.5_x64-setup.exe
-releases_url: https://github.com/seanmmcd/aramis-editor/releases
+releases_url: https://github.com/seanmmcd/aramis-editor/releases/latest
 
 exclude:
   - Gemfile
