@@ -4,6 +4,7 @@ import { useLibraryStore } from "@/stores/useLibraryStore";
 import { syncLibrarySelectionToExportQueue } from "@/stores/useExportStore";
 import { useFilmstripSelection } from "@/features/library/useFilmstripSelection";
 import { useUIStore } from "@/stores/useUIStore";
+import { useTitlebarDoubleClickMaximize, WindowControls } from "./WindowControls";
 
 const tabs = [
   { to: "/library", label: "Library", module: "library" as const },
@@ -28,37 +29,56 @@ export function TopBar() {
   const setActiveModule = useUIStore((s) => s.setActiveModule);
   const setExportDialogOpen = useUIStore((s) => s.setExportDialogOpen);
   const photoId = useDevelopStore((s) => s.photoId);
+  const onTitlebarMouseDown = useTitlebarDoubleClickMaximize();
 
   return (
-    <header className="flex h-12 items-center gap-4 border-b border-ae-border bg-ae-panel px-4">
-      <span className="text-sm font-semibold text-ae-text-primary">Aramis Editor</span>
-      <nav className="flex gap-2">
-        {tabs.map((tab) => (
-          <Link
-            key={tab.to}
-            to={tab.to}
-            onClick={() => {
-              setActiveModule(tab.module);
-              if (tab.module === "export") {
-                const { selectedPhotoIds } = useFilmstripSelection.getState();
-                const { photos } = useLibraryStore.getState();
-                syncLibrarySelectionToExportQueue(selectedPhotoIds, photos);
-              }
-            }}
-            className={`rounded px-3 py-1 text-sm ${
-              location.pathname.startsWith(tab.to)
-                ? "bg-ae-accent text-white"
-                : "text-ae-muted hover:text-ae-text-primary"
-            }`}
-          >
-            {tab.label}
-          </Link>
-        ))}
-      </nav>
-      <div className="ml-auto flex items-center gap-2">
+    <header className="flex h-10 shrink-0 items-stretch border-b border-ae-border bg-ae-panel">
+      <div className="flex min-w-0 flex-1 items-stretch">
+        <div
+          data-tauri-drag-region
+          onMouseDown={onTitlebarMouseDown}
+          className="flex shrink-0 items-center px-3"
+        >
+          <span className="select-none text-sm font-semibold text-ae-text-primary">
+            Aramis Editor
+          </span>
+        </div>
+
+        <nav className="flex shrink-0 items-center gap-1 px-1">
+          {tabs.map((tab) => (
+            <Link
+              key={tab.to}
+              to={tab.to}
+              onClick={() => {
+                setActiveModule(tab.module);
+                if (tab.module === "export") {
+                  const { selectedPhotoIds } = useFilmstripSelection.getState();
+                  const { photos } = useLibraryStore.getState();
+                  syncLibrarySelectionToExportQueue(selectedPhotoIds, photos);
+                }
+              }}
+              className={`rounded px-2.5 py-1 text-xs ${
+                location.pathname.startsWith(tab.to)
+                  ? "bg-ae-accent text-white"
+                  : "text-ae-muted hover:text-ae-text-primary"
+              }`}
+            >
+              {tab.label}
+            </Link>
+          ))}
+        </nav>
+
+        <div
+          data-tauri-drag-region
+          onMouseDown={onTitlebarMouseDown}
+          className="min-w-4 flex-1"
+        />
+      </div>
+
+      <div className="flex shrink-0 items-center gap-1.5 border-l border-ae-border px-2">
         <Link
           to="/settings"
-          className={`rounded px-3 py-1 text-xs ${
+          className={`rounded px-2.5 py-1 text-xs ${
             location.pathname.startsWith("/settings")
               ? "bg-ae-accent text-white"
               : "text-ae-muted hover:text-ae-text-primary"
@@ -70,18 +90,20 @@ export function TopBar() {
           type="button"
           disabled={photoId == null}
           onClick={() => setExportDialogOpen(true)}
-          className="rounded bg-ae-bg-secondary px-3 py-1 text-xs text-ae-text-primary hover:bg-ae-border disabled:opacity-40"
+          className="rounded bg-ae-bg-secondary px-2.5 py-1 text-xs text-ae-text-primary hover:bg-ae-border disabled:opacity-40"
         >
           Quick Export
         </button>
         <button
           type="button"
           onClick={() => goToExport(navigate, setActiveModule)}
-          className="rounded bg-ae-accent px-3 py-1 text-xs text-white"
+          className="rounded bg-ae-accent px-2.5 py-1 text-xs text-white"
         >
           Batch Export
         </button>
       </div>
+
+      <WindowControls />
     </header>
   );
 }

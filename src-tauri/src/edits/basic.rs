@@ -1,14 +1,20 @@
 use super::util::{linear_to_srgb, luminance, map_pixels_display_space, smoothstep};
 use super::EDIT_STRENGTH;
 
+/// Scale for basic develop sliders that felt too intense at full strength.
+const BASIC_INTENSITY: f32 = 0.1;
+
 /// EV adjustment in linear space, luminance-weighted (preserves chroma).
 /// Strength tuned below full slider range so ±1 EV feels natural in the UI.
-const EXPOSURE_STRENGTH: f32 = 0.55;
-const CONTRAST_STRENGTH: f32 = 0.65;
+const EXPOSURE_STRENGTH: f32 = 0.55 * BASIC_INTENSITY;
+const CONTRAST_STRENGTH: f32 = 0.65 * BASIC_INTENSITY;
 const SHADOWS_STRENGTH: f32 = 0.55;
 const HIGHLIGHTS_STRENGTH: f32 = 0.75;
 const HIGHLIGHTS_AMOUNT: f32 = 0.55;
-const VIBRANCE_STRENGTH: f32 = 0.38;
+const VIBRANCE_STRENGTH: f32 = 0.38 * BASIC_INTENSITY;
+const SATURATION_STRENGTH: f32 = EDIT_STRENGTH * BASIC_INTENSITY;
+const WHITES_BLACKS_STRENGTH: f32 = EDIT_STRENGTH * BASIC_INTENSITY;
+const TINT_STRENGTH: f32 = 0.15 * BASIC_INTENSITY;
 
 pub fn apply_exposure(p: &mut [f32], ev: f32) {
     if ev.abs() < f32::EPSILON {
@@ -96,8 +102,8 @@ pub fn apply_whites_blacks(p: &mut [f32], whites: f32, blacks: f32) {
     if whites.abs() < 0.01 && blacks.abs() < 0.01 {
         return;
     }
-    let ws = whites / 100.0 * EDIT_STRENGTH;
-    let bs = blacks / 100.0 * EDIT_STRENGTH;
+    let ws = whites / 100.0 * WHITES_BLACKS_STRENGTH;
+    let bs = blacks / 100.0 * WHITES_BLACKS_STRENGTH;
     const BLACKS_LIFT: f32 = 0.18;
     const WHITES_LIFT: f32 = 0.38;
     for px in p.chunks_exact_mut(3) {
@@ -145,7 +151,7 @@ pub fn apply_vibrance_saturation(p: &mut [f32], vibrance: f32, saturation: f32) 
     if vibrance.abs() < 0.01 && saturation.abs() < 0.01 {
         return;
     }
-    let sat = 1.0 + saturation / 100.0 * EDIT_STRENGTH;
+    let sat = 1.0 + saturation / 100.0 * SATURATION_STRENGTH;
     let vib = vibrance / 100.0 * VIBRANCE_STRENGTH;
     map_pixels_display_space(p, |r, g, b| {
         let (h, mut sl, l) = rgb_to_hsl_local(r, g, b);
@@ -183,7 +189,7 @@ fn wb(temp: f32, tint: f32) -> [f32; 3] {
     let t = temp_to_rgb(temp.clamp(2000.0, 50000.0));
     let r = temp_to_rgb(6500.0);
     let mut rgb = [t[0] / r[0], t[1] / r[1], t[2] / r[2]];
-    let tf = 1.0 + tint / 150.0 * 0.15;
+    let tf = 1.0 + tint / 150.0 * TINT_STRENGTH;
     rgb[1] *= tf;
     rgb[0] /= tf.sqrt();
     rgb[2] *= tf.sqrt();
@@ -277,8 +283,8 @@ mod tests {
     fn exposure_boosts_midgray() {
         let mut p = vec![0.18, 0.18, 0.18];
         apply_exposure(&mut p, 1.0);
-        assert!(p[0] > 0.22, "midtone should lift with +1 EV");
-        assert!(p[0] < 0.36, "exposure should stay subtler than hard double");
+        assert!(p[0] > 0.185, "midtone should lift with +1 EV");
+        assert!(p[0] < 0.22, "exposure should stay subtler than hard double");
     }
 
     #[test]
@@ -301,7 +307,7 @@ mod tests {
     fn blacks_lift_is_subtle() {
         let mut p = vec![0.02, 0.02, 0.02];
         apply_whites_blacks(&mut p, 0.0, 100.0);
-        assert!(p[0] < 0.25, "full blacks slider should not crush-lift shadows");
-        assert!(p[0] > 0.10);
+        assert!(p[0] < 0.10, "full blacks slider should not crush-lift shadows");
+        assert!(p[0] > 0.03);
     }
 }
