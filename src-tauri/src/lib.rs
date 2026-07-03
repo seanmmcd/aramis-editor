@@ -21,7 +21,7 @@ use editor::{Editor, EditorError};
 use edits::EditStack;
 use export::{export_batch, export_photo, BatchExportResult, ExportResult, ExportSettings};
 use history::HistoryEntry;
-use library::{Library, LibraryError};
+use library::{ImportResult, Library, LibraryError};
 use image::codecs::jpeg::JpegEncoder;
 use image::ExtendedColorType;
 use presets::Preset;
@@ -64,7 +64,7 @@ fn list_supported_raw_formats() -> Vec<String> {
 }
 
 #[tauri::command]
-fn import_folder(state: tauri::State<'_, AppState>, path: String) -> Result<u32, String> {
+fn import_folder(state: tauri::State<'_, AppState>, path: String) -> Result<ImportResult, String> {
     state.with_library(|lib| lib.import_folder(path))
 }
 

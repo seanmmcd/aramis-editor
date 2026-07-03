@@ -2,6 +2,15 @@ import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import type { Folder, Photo } from "@/features/library/types";
 
+type ImportResult = {
+  folder_id: number;
+  imported: number;
+  skipped: number;
+};
+
+let photosRequestSeq = 0;
+let searchRequestSeq = 0;
+
 function photoListChanged(a: Photo[], b: Photo[]): boolean {
   if (a.length !== b.length) return true;
   for (let i = 0; i < a.length; i++) {
@@ -56,11 +65,22 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
 
   refreshPhotos: async (folderId, options) => {
     const silent = options?.silent ?? false;
+    const requestSeq = ++photosRequestSeq;
+
+    if (folderId == null) {
+      set({ photos: [], ...(silent ? {} : { photosLoading: false }) });
+      return;
+    }
+
     if (!silent) {
       set({ photosLoading: true, error: null });
     }
     try {
       const photos = await invoke<Photo[]>("list_photos", { folderId });
+      if (requestSeq !== photosRequestSeq || get().selectedFolderId !== folderId) {
+        if (!silent) set({ photosLoading: false });
+        return;
+      }
       const prev = get().photos;
       if (!photoListChanged(prev, photos)) {
         if (!silent) set({ photosLoading: false });
@@ -68,13 +88,17 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
       }
       set({ photos, ...(silent ? {} : { photosLoading: false }) });
     } catch (error) {
-      set({ error: String(error), ...(silent ? {} : { photosLoading: false }) });
+      if (requestSeq === photosRequestSeq) {
+        set({ error: String(error), ...(silent ? {} : { photosLoading: false }) });
+      }
     }
   },
 
   searchPhotos: async (query, options) => {
     const trimmed = query.trim();
     const silent = options?.silent ?? false;
+    const requestSeq = ++searchRequestSeq;
+
     if (!silent) {
       set({ searchQuery: query, photosLoading: true, error: null });
     }
@@ -85,6 +109,10 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     }
     try {
       const searchResults = await invoke<Photo[]>("search_photos", { query: trimmed });
+      if (requestSeq !== searchRequestSeq || get().searchQuery.trim() !== trimmed) {
+        if (!silent) set({ photosLoading: false });
+        return;
+      }
       const prev = get().searchResults ?? [];
       if (!photoListChanged(prev, searchResults)) {
         if (!silent) set({ photosLoading: false });
@@ -96,7 +124,9 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         ...(silent ? {} : { photosLoading: false }),
       });
     } catch (error) {
-      set({ error: String(error), ...(silent ? {} : { photosLoading: false }) });
+      if (requestSeq === searchRequestSeq) {
+        set({ error: String(error), ...(silent ? {} : { photosLoading: false }) });
+      }
     }
   },
 
@@ -105,13 +135,10 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   importFolder: async (path) => {
     set({ foldersLoading: true, error: null });
     try {
-      await invoke<number>("import_folder", { path });
+      const result = await invoke<ImportResult>("import_folder", { path });
       await get().refreshFolders();
-      const imported = get().folders.find((f) => f.path === path);
-      if (imported) {
-        set({ selectedFolderId: imported.id });
-        await get().refreshPhotos(imported.id);
-      }
+      set({ selectedFolderId: result.folder_id, photos: [] });
+      await get().refreshPhotos(result.folder_id);
     } catch (error) {
       set({ error: String(error) });
     } finally {
@@ -169,6 +196,6 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
 
   selectFolder: (folderId) => {
     get().clearSearch();
-    set({ selectedFolderId: folderId });
+    set({ selectedFolderId: folderId, photos: [] });
   },
 }));

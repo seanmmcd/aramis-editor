@@ -25,7 +25,7 @@ export function SliderControl({
   onChange,
 }: SliderControlProps) {
   const handleReset = () => {
-    if (disabled) return;
+    if (disabled || value === resetValue) return;
     onChange?.(resetValue);
   };
 
@@ -38,11 +38,13 @@ export function SliderControl({
         : `${Math.round(value)}`;
 
   return (
-    <div className={`flex flex-col gap-1 ${disabled ? "opacity-50" : ""}`}>
+    <div className={`flex flex-col gap-1 ${disabled ? "opacity-50" : ""}`} title="Double-click to reset">
       <div
-        className="flex cursor-default items-center justify-between"
-        onDoubleClick={handleReset}
-        title="Double-click label to reset"
+        className="flex cursor-default select-none items-center justify-between"
+        onDoubleClick={(event) => {
+          event.preventDefault();
+          handleReset();
+        }}
       >
         <label className="text-xs text-ae-text-secondary">{label}</label>
         <span className="min-w-[2.5rem] text-right text-xs tabular-nums text-ae-text-secondary">
@@ -57,7 +59,16 @@ export function SliderControl({
         value={value}
         disabled={disabled}
         onChange={(event) => onChange?.(Number(event.target.value))}
-        onPointerDown={() => beginInteractiveEdit()}
+        onPointerDown={(event) => {
+          if (disabled) return;
+          // Range inputs often skip dblclick in WebView2; detail === 2 is the second mousedown.
+          if (event.detail >= 2) {
+            event.preventDefault();
+            handleReset();
+            return;
+          }
+          beginInteractiveEdit();
+        }}
         onPointerUp={() => endInteractiveEdit()}
         onPointerCancel={() => endInteractiveEdit()}
         aria-label={label}

@@ -53,7 +53,7 @@ export function PhotoGrid() {
   };
 
   useEffect(() => {
-    if (!isSearchMode) {
+    if (!isSearchMode && selectedFolderId != null) {
       void refreshPhotos(selectedFolderId);
     }
   }, [selectedFolderId, refreshPhotos, isSearchMode]);

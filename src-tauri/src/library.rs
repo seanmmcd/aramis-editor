@@ -62,8 +62,8 @@ impl Library {
         &self.catalog
     }
 
-    pub fn import_folder(&self, path: String) -> Result<u32, LibraryError> {
-        Ok(import_folder(&self.catalog, &self.catalog_db_path, &path)?.imported)
+    pub fn import_folder(&self, path: String) -> Result<ImportResult, LibraryError> {
+        import_folder(&self.catalog, &self.catalog_db_path, &path).map_err(Into::into)
     }
 
     pub fn list_photos(&self, folder_id: Option<i64>) -> Result<Vec<PhotoRow>, LibraryError> {
